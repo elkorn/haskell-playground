@@ -1,0 +1,6 @@
+main:
+  build: .
+  command: ghci
+  volumes:
+    - .:/code
+  tty: true
