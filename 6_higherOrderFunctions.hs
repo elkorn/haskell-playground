@@ -76,6 +76,60 @@ numLongChains :: Int
 numLongChains = length (filter isLong (map chain [1..100]))
     where isLong xs = length xs > 15
 
+flip'' :: (a -> b -> c) -> b -> a -> c
+flip'' f = \x y -> f y x
+
+sum'' :: (Integral a) => [a] -> a
+sum'' xs = foldl (+) 0 xs
+
+tacitSum :: (Integral a) => [a] -> a
+tacitSum = foldl (+) 0
+
+elem' :: (Eq a) => a -> [a] -> Bool
+elem' y ys = foldl (\acc x -> if x == y then True else acc) False ys
+
+map'' :: (a->b) -> [a] -> [b]
+map'' f xs = foldr (\x acc -> f x : acc) [] xs
+
+-- can be implemented via foldl, but ++ is much more expensive than :
+map''' :: (a->b) -> [a] -> [b]
+map''' f xs = foldl (\acc x -> acc ++ [f x]) [] xs
+
+-- foldl1 and foldr1 are variants that assume the first element of the list as the initial acc value.
+maximum' :: (Ord a) => [a] -> a
+maximum' = foldr1 (\x acc -> if x > acc then x else acc)
+
+reverse' :: (Ord a) => [a] -> [a]
+reverse' = foldl (\acc x -> x:acc) []
+
+reverse'' :: (Ord a) => [a] -> [a]
+reverse'' = foldl (flip (:) )[]
+
+product' :: (Num a) => [a] -> a
+product' = foldr1 (*)
+
+head' :: [a] -> a
+head' = foldr1 (\x _ -> x)
+
+head'' :: [a] -> a
+head'' = foldl1 (\x _ -> x)
+
+last' :: [a] -> a
+last' = foldl1 (\_ x -> x)
+
+last'' :: [a] -> a
+last'' = foldr1 (\_ x -> x)
+
+-- how many elements does it take for the sum of the roots of all natural
+-- numbers to exceed 1000?
+sqrtSums :: Int
+sqrtSums = length(takeWhile (< 1000) (scanl1 (+) (map sqrt [1..]))) + 1
+-- map sqrt [1..]     -> get the sqrts of all natural numbers
+-- scanl 1 (+)        -> see the consecutive values of the sum
+-- takeWhile (< 1000) -> work while elements are < 1000
+-- length             -> :)
+-- +1                 -> X elements are < 1000, so we need X+1 to exceed 1000
+main :: IO()
 main = do
   print $ compareWithHundred 10
   print $ compareWithHundred2 10
@@ -105,4 +159,25 @@ main = do
   print $ numLongChains
   -- See how the range gets mapped to a list of functions
   print $ let listOfFuns = map (*) [0..] in (listOfFuns !! 4) 15
-
+  -- print $ map (*) [0..] $ [1,2,3]
+  print $ zipWith (\a b -> (a * 30 +3) / b) [5,2, 1] [1,2,5]
+  print $ flip'' (/) 10 5
+  print $ sum'' [1,2,3,4,5]
+  print $ tacitSum [1,2,3,4,5]
+  print $ elem' 4 [1,2,3,4]
+  print $ map'' (+2) [1,2,3,4]
+  print $ map''' (+2) [1,2,3,4]
+  print $ maximum' [1,2,3,4]
+  print $ reverse' [1,2,3,4]
+  print $ product' [1,2,3,4]
+  print $ head' [1,2,3,4]
+  print $ head'' [1,2,3,4]
+  print $ last' [1,2,3,4]
+  print $ last'' [1,2,3,4]
+  print $ reverse'' [1,2,3,4]
+  -- scanl and scanr are like folds but they report the intermediate accumulator states
+  print $ scanl (+) 0 [1,2,3,4]
+  print $ scanr (+) 0 [1,2,3,4]
+  print $ sqrtSums
+  print $ sum (map sqrt [1..131])
+  print $ sum (map sqrt [1..130])
