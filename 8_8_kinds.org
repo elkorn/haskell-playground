@@ -1,0 +1,113 @@
+Kinds are to types what types are to values.
+
+#+begin_src ghci
+:k Int
+Int :: *
+#+end_src
+
+This means that =Int= is a concrete type.
+
+#+begin_src ghci
+:k Maybe
+Maybe :: * -> *
+#+end_src
+
+This means that =Maybe= is a type constructor that will produce a concrete type when it is provided with another
+concrete type as argument.
+
+#+begin_src ghci
+:k Maybe Int
+Maybe Int :: *
+#+end_src
+
+
+=Maybe Int= is a concrete type.
+
+Another kind:
+
+#+begin_src ghci
+:k Either
+Either :: * -> * -> *
+#+end_src
+
+=Either= requires two concrete types to produce a concrete type itself.
+
+For clarity:
+
+#+begin_src ghci
+:k Either Stirng
+Either String :: * -> *
+
+:k Either String Int
+Either String Int :: *
+#+end_src
+
+This is also the reason why =Either= had to be partially applied when 
+it was being made an instance of the =Functor= typeclass.
+
+* Example Frank and Tofu
+
+#+begin_src haskell
+class Tofu t where
+  tofu :: j a -> t a j
+#+end_src
+
+Analysis of how one would approach creating an instance of such typeclass:
+
+- =j a= is used as the type of =tofu='s parameter, so it has to have a kind of =*=.
+- Assuming =*= for =a= it can be inferred that =j= has to have a kind of =* -> *=.
+- From =t a j= it can be inferred that =t= produces a value being given two types.
+  - Because =a= has a kind of =*= and =j= of =* -> *=, it can be inferred that =t= has a kind of =* -> (* -> *) -> *=.
+    I.e. =t= takes a concrete type =a=, a type constructor =j= that takes one concrete type, and produces a concrete type.
+
+#+begin_src ghci
+data Frank a b = Frank {field :: b a} deriving (Show)
+#+end_src
+
+Fields in ADTs hold values, so =a= has a kind of =*=. Then =b= takes one type parameter, its kind is =* -> *=.
+This shows that =Frank='s kind is =* -> (* -> *) -> *=.
+
+#+begin_src ghci
+:t Frank {field = Just 12}
+Frank {field = Just 12} :: Frank Int Maybe
+
+:t Frank {field = "YES"}
+Frank {field = "YES"} :: Frank Char []
+#+end_src
+
+To make =Frank= an instance of =Tofu=, one needs to see that =tofu= takes a =j a= (e.g. =Maybe Int=) and returns a =t a j= (e.g. =t Int Maybe=).
+Using =Frank= in place of =j= gives a simple declaration of =Frank Int Maybe=.
+
+#+begin_src ghci
+instance Tofu Frank where
+  tofu x = Frank x
+
+tofu (Just 'a') :: Frank Char Maybe
+Frank {field = Just 'a'}
+#+end_src
+
+* Example: Barry
+
+The example is making the following datatype an instance of =Functor=.
+
+#+begin_src ghci
+data Barry t k p = Barry { yabba :: p, dabba :: t k }
+#+end_src
+
+=Functor= needs a kind of =* -> *=.
+=Barry= however has:
+#+begin_src ghci
+:k Barry
+(* -> *) -> * -> * -> *
+#+end_src
+
+To get the proper kind for =Functor=, =Barry= has to have the first two parameters applied:
+
+#+begin_src ghci
+instance Functor (Barry a b) where
+  fmap f (Barry { yabba = x, dabba = y}) = Barry { yabba = f x, dabba = y }
+#+end_src
+
+The concrete type of =fmap= for =Barry= will be =(a -> b) -> Barry c d a -> Barry c d b=.
+
+
