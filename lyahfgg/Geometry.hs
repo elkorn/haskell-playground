@@ -1,11 +1,7 @@
 module Geometry
-( sphereVolume
-, sphereArea
-, cubeVolume
-, cubeArea
-, cuboidArea
-, cuboidVolume
-) where
+       (sphereVolume, sphereArea, cubeVolume, cubeArea, cuboidArea,
+        cuboidVolume)
+       where
 
 sphereVolume :: Float -> Float
 sphereVolume radius = (4.0 / 3.0) *
@@ -28,7 +24,15 @@ cuboidVolume a b c = rectangleArea
         (b * c)
 
 cuboidArea :: Float -> Float -> Float -> Float
-cuboidArea a b c = rectangleArea a (b*2) + rectangleArea a (c*2) + rectangleArea c (b*2)
+cuboidArea a b c = rectangleArea
+        a
+        (b * 2) +
+    rectangleArea
+        a
+        (c * 2) +
+    rectangleArea
+        c
+        (b * 2)
 
 rectangleArea :: Float -> Float -> Float
 rectangleArea = (*)
