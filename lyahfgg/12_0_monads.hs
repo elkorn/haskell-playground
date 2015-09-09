@@ -1,59 +1,116 @@
 main = do
-  print $ "hello"
-  print $ max <$> Just 3 <*> Just 5
-  print $ applyMaybe Nothing (Just . (+1))
-  print $ applyMaybe (Just 3) (Just . (+1))
-  print $ (Just 3) `applyMaybe` (Just . (+1))
-  print $ (Just 13) >>= (return . (*8))
-  print $ (return "WHAT" :: Maybe String)
-  print $ justHead "test"
-  print $ justHead ""
-  print $ [1,2,3] >>= \x -> [x+1,x+2,x+3]
-  print $ [1,2] >>= \n -> ['a','b'] >>= \ch -> return (n, ch)
-  print $ (guard (5 > 2) :: [()])
-  -- `guard` facilitates a failure, making it useful for filtering.
-  print $ [1..50] >>= (\x -> guard ('7' `elem` show x) >> return x)
+    print $ "hello"
+    print $
+        max <$>
+        Just 3 <*>
+        Just 5
+    print $
+        applyMaybe
+            Nothing
+            (Just . (+ 1))
+    print $
+        applyMaybe
+            (Just 3)
+            (Just . (+ 1))
+    print $
+        (Just 3) `applyMaybe`
+        (Just . (+ 1))
+    print $
+        (Just 13) >>=
+        (return . (* 8))
+    print $
+        (return "WHAT" :: Maybe String)
+    print $
+        justHead "test"
+    print $
+        justHead ""
+    print $
+        [1, 2, 3] >>=
+        \x ->
+             [x + 1, x + 2, x + 3]
+    print $
+        [1, 2] >>=
+        \n ->
+             ['a', 'b'] >>=
+             \ch ->
+                  return (n, ch)
+    print $
+        (guard (5 > 2) :: [()])
+    -- `guard` facilitates a failure, making it useful for filtering.
+    print $
+        [1 .. 50] >>=
+        (\x ->
+              guard ('7' `elem` show x) >>
+              return x)
+    print $
+        [x | x <- [1 .. 50]
+           , '7' `elem` show x]
+    print $
+        (guard (5 > 2) >>
+         return "cool" :: [String])
+    print $
+        (guard (1 > 2) >>
+         return "cool" :: [String])
+    print $
+        (Just "test") >>=
+        return
+    print $
+        (Nothing >>= return :: Maybe Int)
+    print $
+        let f x = [x, -x]
+            g x = [x * 3, x * 2]
+            h = f <=< g
+        in h 3
+  
 
 applyMaybe :: Maybe a -> (a -> Maybe b) -> Maybe b
 applyMaybe Nothing _ = Nothing
 applyMaybe (Just x) f = f x
 
 instance Monad' Maybe where
-  return' = Just
-  Nothing >>>= _ = Nothing
-  Just x >>>= f = f x
-  fail _ = Nothing
+    return' = Just
+    Nothing >>>= _ = Nothing
+    Just x >>>= f = f x
+    fail _ = Nothing
 
-class Monad' m where
-  return' :: a -> m a
+class Monad' m  where
+    return' :: a -> m a
+    (>>>=) :: m a -> (a -> m b) -> m b
+    (>>>) :: m a -> m b -> m b
+    x >>> y = x >>>= \_ ->
+                          y
+    fail :: String -> m a
+    fail = error
 
-  (>>>=) :: m a -> (a -> m b) -> m b
-
-  (>>>) :: m a -> m b -> m b
-  x >>> y = x >>>= \_ -> y
-
-  fail :: String -> m a
-  fail = error
-
-justHead ::String -> Maybe Char
+justHead :: String -> Maybe Char
 justHead str = do
-  (h:_) <- Just str
-  return h
+    (h:_) <- Just str
+    return h
 
 instance Monad' [] where
-  return' x = [x]
-  xs >>>= f = concat (map f xs)
-  fail _ = []
+    return' x = [x]
+    xs >>>= f = concat (map f xs)
+    fail _ = []
 
 -- List comprehensions in terms of monads
-class Monad m => MonadPlus m where
-  mzero :: m a
-  mplus :: m a -> m a -> m a
+
+class Monad m => MonadPlus m  where
+    mzero :: m a
+    mplus :: m a -> m a -> m a
 
 instance MonadPlus [] where
-  mzero = []
-  mplus = (++)
+    mzero = []
+    mplus = (++)
 
-guard :: (MonadPlus m) => Bool -> m ()
+guard :: (MonadPlus m)
+      => Bool -> m ()
 guard True = return ()
 guard False = mzero
+
+
+-- Monadic function composition
+
+(<=<) :: (Monad m)
+      => (b -> m c) -> (a -> m b) -> (a -> m c)
+f <=< g = (\x ->
+                g x >>= f)
