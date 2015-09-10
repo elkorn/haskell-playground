@@ -17,4 +17,5 @@ cabal-version:       >=1.8
 library
   exposed-modules:     Geometry, Geometry.Cuboid, Geometry.Cube, Geometry.Sphere
   -- other-modules:       
-  build-depends:       base ==4.7.*
+  build-depends:       base ==4.8.*
+                     , mtl >= 2.2.1
