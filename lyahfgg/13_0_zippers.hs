@@ -1,9 +1,14 @@
 main = do
     let newTree = changeTo 'P' [R,L] freeTree
     print $ elemAt [R,L] newTree
-    print $ goLeft $ goRight $ (freeTree, [])
-    print $ (freeTree, []) -: goRight -: goLeft
-    print $ (freeTree, []) -: goRight -: goLeft -: goUp -: goUp
+    -- print $ goLeft $ goRight $ (freeTree, [])
+    print $ return (freeTree, []) >>= goRight >>= goLeft
+    print $ return (freeTree, []) >>= goRight >>= goLeft >>= goUp >>= goUp
+    -- print $ (modify (\_ -> 'X') $ (freeTree, []) >>= goLeft >>= goRight) >>= goUp >>= goUp
+    -- print $ "---"
+    print $ return (freeTree, []) >>= goLeft >>= goRight >>= modify (\_ -> 'X') >>= goUp >>= goUp
+    print $ let farLeft = return (freeTree, []) >>= goLeft >>= goLeft >>= goLeft >>= goLeft
+      in  farLeft >>= topMost >>= attach (leaf 'Z')
 
 data Tree a
     = Empty
@@ -19,22 +24,25 @@ freeTree = Node
              'O'
              (Node
                   'L'
-                  (Node 'N' Empty Empty)
-                  (Node 'T' Empty Empty))
+                  (leaf 'N')
+                  (leaf 'T'))
              (Node
                   'Y'
-                  (Node 'S' Empty Empty)
-                  (Node 'A' Empty Empty)))
+                  (leaf 'S')
+                  (leaf 'A')))
         (Node
              'L'
              (Node
                   'W'
-                  (Node 'C' Empty Empty)
-                  (Node 'R' Empty Empty))
+                  (leaf 'C')
+                  (leaf 'R'))
              (Node
                   'A'
-                  (Node 'A' Empty Empty)
-                  (Node 'C' Empty Empty)))
+                  (leaf 'A')
+                  (leaf 'C')))
+
+leaf :: a -> Tree a
+leaf x = Node x Empty Empty
 
 changeToP :: Tree Char -> Tree Char
 changeToP (Node x l (Node y (Node _ m n) r)) = Node x l (Node y (Node 'P' m n) r)
@@ -55,16 +63,31 @@ elemAt [] (Node x _ _) = x
 data Crumb a = LeftCrumb a (Tree a) | RightCrumb a (Tree a) deriving (Show)
 type Breadcrumbs a = [Crumb a]
 
-goLeft :: (Tree a, Breadcrumbs a) -> (Tree a, Breadcrumbs a)
-goLeft (Node x l r, bs) = (l, LeftCrumb x r:bs)
+type Zipper a = (Tree a, Breadcrumbs a)
 
-goRight :: (Tree a, Breadcrumbs a) -> (Tree a, Breadcrumbs a)
-goRight (Node x l r, bs) = (r, RightCrumb x l:bs)
+goLeft :: Zipper a -> Maybe (Zipper a)
+goLeft (Node x l r, bs) = Just (l, LeftCrumb x r:bs)
+goLeft (Empty, _) = Nothing
 
-goUp :: (Tree a, Breadcrumbs a) -> (Tree a, Breadcrumbs a)
-goUp (t, LeftCrumb x r:bs) = (Node x t r, bs)
-goUp (t, RightCrumb x l:bs) = (Node x l t, bs)
-goUp (t, []) = (t, [])
+goRight :: Zipper a -> Maybe (Zipper a)
+goRight (Node x l r, bs) = Just (r, RightCrumb x l:bs)
+goRight (Empty, _) = Nothing
 
-(-:) :: a -> (a -> b) -> b
-x -: f = f x
+goUp :: Zipper a -> Maybe (Zipper a)
+goUp (t, LeftCrumb x r:bs) = Just (Node x t r, bs)
+goUp (t, RightCrumb x l:bs) = Just (Node x l t, bs)
+goUp (_, []) = Nothing
+
+modify :: (a -> a) -> Zipper a -> Maybe (Zipper a)
+modify f (Node x l r, bs) = Just (Node (f x) l r, bs)
+modify f (Empty, bs) = Just (Empty, bs)
+
+attach :: Tree a -> Zipper a -> Maybe (Zipper a)
+attach t (_, bs) = Just (t, bs)
+
+topMost :: Zipper a -> Maybe (Zipper a)
+topMost (t, []) = Just (t, [])
+topMost z = goUp z >>= topMost
+-- topMost z = do
+--   up <- goUp z
+--   topMost up
