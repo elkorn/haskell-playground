@@ -1,4 +1,4 @@
-module Commits (get) where
+module HBugSpots.Internal.Commits (get) where
 
 import qualified Github.Repos.Commits as Github
 
