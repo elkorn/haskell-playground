@@ -20,11 +20,15 @@ library
   default-language: Haskell2010
   hs-source-dirs: src
   exposed-modules: HBugSpots
-  other-modules:   Commits
+                 , HBugSpots.Internal.Commits
+                 , HBugSpots.Internal.Fixes
+  -- other-modules:
   build-depends:
-                base   >= 4.6   && < 5,
-                regex-posix >= 0.95,
-                github >= 0.13
+                  base >= 4.8.0.0
+                , github >= 0.13.2
+                , github >= 0.13.2
+                , regex-posix >= 0.95
+                , time >= 1.5.0.1
 
 -- executable hbugspots
 --   main-is:             Main.hs
@@ -39,10 +43,12 @@ test-suite unit-tests
   main-is:        Main.hs
   hs-source-dirs: test
   build-depends:
-    base                       >= 4.8 && < 5,
-    HUnit                      >= 1.2,
-    -- QuickCheck                 >= 2.4,
-    test-framework             >= 0.6,
-    test-framework-hunit       >= 0.3
-    -- test-framework-quickcheck2 >= 0.2,
-    -- test-framework-th          >= 0.2
+                  base >= 4.8.0.0
+                , hbugspots >= 0.1.0.0
+                , github >= 0.13.2
+                , regex-posix >= 0.95
+                , HUnit >= 1.3.0.0
+                , test-framework >= 0.8.1.1
+                , test-framework >= 0.8.1.1
+                , test-framework-hunit >= 0.3.0.2
+                , time >= 1.5.0.1

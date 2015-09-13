@@ -1,24 +1,14 @@
 module HBugSpots where
 
 import qualified Data.List as List
-import qualified Commits
-import Text.Regex.Posix
+import qualified HBugSpots.Internal.Commits as Commits
 
 import qualified Github.Repos.Commits as Github
-
-data Fix =
-  Fix {message :: String
-      ,date :: String
-      ,files :: [String]}
-  deriving (Show)
 
 data Hotspot =
   Hotspot {file :: String
           ,score :: Float}
   deriving (Show)
-
-defaultRegex :: String
-defaultRegex = "(fix(es|ed)?|close(s|d)? #[0-9]+)"
 
 formatAuthor :: Github.GitUser -> String
 formatAuthor author =
@@ -49,7 +39,11 @@ showPossibleCommits possibleCommits =
       List.intercalate "\n\n" $
       map formatCommit commits
 
+printNewest :: Either Github.Error [Github.Commit] -> IO ()
+printNewest (Left err) = print err
+printNewest (Right commits) = print $ head commits
+
 find :: String -> String -> IO ()
 find owner repo =
   Commits.get owner repo >>=
-  showPossibleCommits
+  printNewest
