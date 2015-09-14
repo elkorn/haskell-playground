@@ -1,7 +1,7 @@
 module HBugSpots where
 
 import qualified Data.List as List
-import qualified HBugSpots.Internal.Commits as Commits
+import qualified HBugSpots.Internal.Git as Git
 
 import qualified Github.Repos.Commits as Github
 
@@ -39,11 +39,37 @@ showPossibleCommits possibleCommits =
       List.intercalate "\n\n" $
       map formatCommit commits
 
-printNewest :: Either Github.Error [Github.Commit] -> IO ()
+printNewest :: Git.GitResult [Github.Commit] -> IO ()
 printNewest (Left err) = print err
 printNewest (Right commits) = print $ head commits
 
-find :: String -> String -> IO ()
-find owner repo =
-  Commits.get owner repo >>=
-  printNewest
+showFiles :: Git.GitResult [Github.Commit] -> IO ()
+showFiles (Left err) = print err
+showFiles (Right commits) =
+  print $
+  map (Github.commitFiles) commits
+
+newestDiff :: Git.RepoDescription -> Git.GitResult [Github.Commit] -> IO ()
+newestDiff _ (Left err) = print err
+newestDiff repo (Right (x:y:_)) =
+  Git.getDiff
+    Git.CommitDescription {Git.commitDescriptionRepo = repo
+                          ,Git.commitDescriptionSha = Github.commitSha x}
+    Git.CommitDescription {Git.commitDescriptionRepo = repo
+                          ,Git.commitDescriptionSha = Github.commitSha y} >>=
+  print
+newestDiff _ _ = print "not enough commits."
+
+listCommits :: String -> String -> IO ()
+listCommits owner repo =
+  Git.listCommits
+    Git.RepoDescription {Git.repoDescriptionOwner = owner
+                        ,Git.repoDescriptionName = repo} >>=
+  showFiles
+
+getNewestDiff :: String -> String -> IO ()
+getNewestDiff owner repo =
+  let repoDescription =
+        Git.RepoDescription {Git.repoDescriptionOwner = owner
+                            ,Git.repoDescriptionName = repo}
+  in Git.listCommits repoDescription >>= newestDiff repoDescription
