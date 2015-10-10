@@ -17,4 +17,3 @@ cabal.sandbox.config
 .stack-work
 HaskellStarter/*
 TAGS
-/redo/redo.hs
