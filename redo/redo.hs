@@ -2,6 +2,8 @@
 
 import Control.Exception (catch, IOException(..)) -- SomeException being the root exception type.
 import Control.Monad (filterM, liftM, unless)
+import qualified Data.ByteString.Lazy as BL
+import Data.Digest.Pure.MD5
 import Data.Map.Lazy (fromList, insert, toList, adjust)
 import Data.Maybe (listToMaybe)
 import Debug.Trace (traceShow)
@@ -81,17 +83,23 @@ redoPath target =
 upToDate :: String -> IO Bool
 upToDate target =
   catch (do dependencies <- getDirectoryContents dependenciesDir
-            (traceShow' . all id) `liftM`
+            (all id) `liftM`
               mapM depUpToDate dependencies)
-        (\(e :: IOException)  -> return False)
+        (\(e :: IOException) -> return False)
   where
         -- return $ all $ mapM $ depUpToDate dependencies
         dependenciesDir = ".redo" </> target
         depUpToDate :: FilePath -> IO Bool
         depUpToDate dep =
-          catch (do oldMd5 <-
-                      readFile (dependenciesDir </> dep)
-                    return False)
-                (\e -> return $ ioeGetErrorType e == InappropriateType)-- (\e -> return if ioeGetErrorType e == InappropriateType)
-                                                                       -- then True -- Treat it as a correct dependency, even though it is not a dependency. It's a way of ignoring '.' and '..' directories.
-                                                                       -- else False)
+          catch (do let path = dependenciesDir </> dep
+                    oldMd5 <- 
+                      (head . words) -- getting the first entry in the MD5 because of the 'md5 filename' format that `md5sum` provides.
+                        `liftM`
+                       readFile path
+                    newMd5 <- md5 `liftM` BL.readFile dep
+                    return $ oldMd5 == show newMd5)
+                (\e -> return $ ioeGetErrorType e == InappropriateType -- (\e -> return if ioeGetErrorType e == InappropriateType)
+                 )
+        -- then True -- Treat it as a correct dependency, even though it is not a dependency. It's a way of ignoring '.' and '..' directories.
+        -- else False)
+        getMd5FromLine = head . words
