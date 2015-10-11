@@ -1,17 +1,24 @@
-{-# LANGUAGE StandaloneDeriving #-}
-import Control.Monad (filterM, liftM)
+{-# LANGUAGE ScopedTypeVariables #-}
+
+import Control.Exception (catch, IOException(..)) -- SomeException being the root exception type.
+import Control.Monad (filterM, liftM, unless)
 import Data.Map.Lazy (fromList, insert, toList, adjust)
 import Data.Maybe (listToMaybe)
 import Debug.Trace (traceShow)
-import System.Directory (renameFile, removeFile, doesFileExist)
+import Data.Typeable (typeOf) -- for printing exception types
+import GHC.IO.Exception (IOErrorType(..))
+import System.Directory
+       (renameFile, removeFile, doesFileExist, getDirectoryContents)
 import System.Exit (ExitCode(..))
 import System.FilePath
-       (replaceBaseName, hasExtension, takeBaseName)
+       (replaceBaseName, hasExtension, takeBaseName, (</>))
 import System.Environment (getArgs, getEnvironment)
 import System.IO (hPutStrLn, stderr)
+import System.IO.Error (ioeGetErrorType)
 import System.Process
-       (createProcess, CreateProcess(..), waitForProcess, shell,
-        StdStream(..), CmdSpec(..))
+       (createProcess, CreateProcess(..), waitForProcess, shell)
+
+traceShow' arg = traceShow arg arg
 
 main :: IO ()
 -- main = getArgs >>= mapM_ redo
@@ -19,12 +26,14 @@ main = mapM_ redo =<< getArgs
 
 redo :: String -> IO ()
 redo target =
-  maybe printMissing redo' =<<
-  redoPath target
+  do upToDate' <- upToDate target
+     unless upToDate' $
+       maybe printMissing redo' =<<
+       redoPath target
   where redo' :: FilePath -> IO ()
         redo' path =
           do exit <- runShell $ redoCommand path
-             case traceShow' exit of
+             case exit of
                ExitSuccess ->
                  do renameFile tmp target
                ExitFailure code ->
@@ -42,10 +51,9 @@ redo target =
         runShell cmd =
           do oldEnv <- getEnvironment
              let newEnv =
-                   extendEnv ("REDO_TARGET","target") oldEnv
+                   extendEnv ("REDO_TARGET",target) oldEnv
              (_,_,_,processHandle) <-
                createProcess $
-               traceShow' $
                (shell cmd) {env = Just newEnv}
              waitForProcess processHandle
         extendEnv :: (String,String) -> [(String,String)] -> [(String,String)]
@@ -70,9 +78,20 @@ redoPath target =
                    ".do"]
              else []
 
-traceShow' arg = traceShow arg arg
-
--- Automatically derive an instance in places other than the data type definition point, thanks to StandaloneDeriving.
-deriving instance Show CreateProcess
-deriving instance Show StdStream
-deriving instance Show CmdSpec
+upToDate :: String -> IO Bool
+upToDate target =
+  catch (do dependencies <- getDirectoryContents dependenciesDir
+            (traceShow' . all id) `liftM`
+              mapM depUpToDate dependencies)
+        (\(e :: IOException)  -> return False)
+  where
+        -- return $ all $ mapM $ depUpToDate dependencies
+        dependenciesDir = ".redo" </> target
+        depUpToDate :: FilePath -> IO Bool
+        depUpToDate dep =
+          catch (do oldMd5 <-
+                      readFile (dependenciesDir </> dep)
+                    return False)
+                (\e -> return $ ioeGetErrorType e == InappropriateType)-- (\e -> return if ioeGetErrorType e == InappropriateType)
+                                                                       -- then True -- Treat it as a correct dependency, even though it is not a dependency. It's a way of ignoring '.' and '..' directories.
+                                                                       -- else False)
