@@ -1,40 +1,48 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-import Control.Exception (catch, IOException(..)) -- SomeException being the root exception type.
-import Control.Monad (filterM, liftM, unless)
+import Control.Exception (catch, catchJust, IOException) -- SomeException being the root exception type.
+import Control.Monad (filterM, liftM, unless, guard)
 import qualified Data.ByteString.Lazy as BL
 import Data.Digest.Pure.MD5
 import Data.Map.Lazy (fromList, insert, toList, adjust)
 import Data.Maybe (listToMaybe)
 import Debug.Trace (traceShow)
-import Data.Typeable (typeOf) -- for printing exception types
 import GHC.IO.Exception (IOErrorType(..))
 import System.Directory
-       (renameFile, removeFile, doesFileExist, getDirectoryContents)
+       (renameFile, removeFile, doesFileExist, getDirectoryContents,
+        removeDirectoryRecursive, createDirectoryIfMissing)
 import System.Exit (ExitCode(..))
 import System.FilePath
        (replaceBaseName, hasExtension, takeBaseName, (</>))
 import System.Environment (getArgs, getEnvironment)
 import System.IO (hPutStrLn, stderr)
-import System.IO.Error (ioeGetErrorType)
+import System.IO.Error (ioeGetErrorType, isDoesNotExistError)
 import System.Process
        (createProcess, CreateProcess(..), waitForProcess, shell)
 
+traceShow' :: (Show b)
+           => b -> b
 traceShow' arg = traceShow arg arg
 
 main :: IO ()
+
 -- main = getArgs >>= mapM_ redo
 main = mapM_ redo =<< getArgs
 
 redo :: String -> IO ()
 redo target =
-  do upToDate' <- upToDate target
+  do upToDate' <-
+       traceShow' `liftM`
+       (upToDate metaDepsDir)
      unless upToDate' $
        maybe printMissing redo' =<<
        redoPath target
   where redo' :: FilePath -> IO ()
         redo' path =
-          do exit <- runShell $ redoCommand path
+          do recreateDirectory metaDepsDir
+             (writeFile (metaDepsDir </> path)) =<<
+               md5' path
+             exit <- runShell $ redoCommand path
              case exit of
                ExitSuccess ->
                  do renameFile tmp target
@@ -68,38 +76,48 @@ redo target =
           insert k v $
           fromList oldEnv
         tmp = target ++ "---redoing"
+        metaDepsDir = ".redo" </> target
 
 redoPath :: FilePath -> IO (Maybe FilePath)
 redoPath target =
   listToMaybe `liftM`
   filterM doesFileExist candidates
   where candidates =
-          [target ++ ".do"] ++
+          (target ++ ".do") :
           if hasExtension target
              then [replaceBaseName target "default" ++
                    ".do"]
              else []
 
-upToDate :: String -> IO Bool
-upToDate target =
-  catch (do dependencies <- getDirectoryContents dependenciesDir
+upToDate :: FilePath -> IO Bool
+upToDate metaDepsDir =
+  catch (do dependencies <- getDirectoryContents metaDepsDir
             (all id) `liftM`
               mapM depUpToDate dependencies)
-        (\(e :: IOException) -> return False)
+        (\(_ :: IOException) -> return False)
   where
         -- return $ all $ mapM $ depUpToDate dependencies
-        dependenciesDir = ".redo" </> target
         depUpToDate :: FilePath -> IO Bool
         depUpToDate dep =
-          catch (do let path = dependenciesDir </> dep
-                    oldMd5 <- 
+          catch (do let path = metaDepsDir </> dep
+                    oldMd5 <-
                       (head . words) -- getting the first entry in the MD5 because of the 'md5 filename' format that `md5sum` provides.
-                        `liftM`
-                       readFile path
-                    newMd5 <- md5 `liftM` BL.readFile dep
-                    return $ oldMd5 == show newMd5)
+                       `liftM`
+                      readFile path
+                    newMd5 <- md5' dep
+                    return $ oldMd5 == newMd5)
                 (\e -> return $ ioeGetErrorType e == InappropriateType -- (\e -> return if ioeGetErrorType e == InappropriateType)
-                 )
-        -- then True -- Treat it as a correct dependency, even though it is not a dependency. It's a way of ignoring '.' and '..' directories.
-        -- else False)
-        getMd5FromLine = head . words
+                 )-- then True -- Treat it as a correct dependency, even though it is not a dependency. It's a way of ignoring '.' and '..' directories.
+                  -- else False)
+
+recreateDirectory :: FilePath -> IO ()
+recreateDirectory path =
+  do catchJust (\e -> guard $ isDoesNotExistError e)
+               (removeDirectoryRecursive path)
+               (\_ -> return ())
+     createDirectoryIfMissing True path
+
+md5' :: FilePath -> IO String
+md5' path =
+  (show . md5) `liftM`
+  BL.readFile path
