@@ -14,7 +14,8 @@ import System.Directory
 import System.Exit (ExitCode(..))
 import System.FilePath
        (replaceBaseName, hasExtension, takeBaseName, (</>))
-import System.Environment (getArgs, getEnvironment)
+import System.Environment
+       (getArgs, getEnvironment, getProgName, lookupEnv)
 import System.IO (hPutStrLn, stderr)
 import System.IO.Error (ioeGetErrorType, isDoesNotExistError)
 import System.Process
@@ -24,10 +25,28 @@ traceShow' :: (Show b)
            => b -> b
 traceShow' arg = traceShow arg arg
 
-main :: IO ()
+redoTargetKey :: String
+redoTargetKey = "REDO_TARGET"
 
+metaDir :: String
+metaDir = ".redo"
+
+main :: IO ()
 -- main = getArgs >>= mapM_ redo
-main = mapM_ redo =<< getArgs
+main =
+  do mapM_ redo =<< getArgs
+     progName <- getProgName
+     possibleRedoTarget <- lookupEnv redoTargetKey
+     case (progName,possibleRedoTarget) of
+       ("redo-ifchange",Just redoTarget) ->
+         mapM_ (writeMD5 redoTarget) =<<
+         getArgs
+       ("redo-ifchange",Nothing) ->
+         error "Missing REDO_TARGET environment variable."
+       _ -> return ()
+  where writeMD5 redoTarget dep =
+          writeFile (metaDir </> redoTarget </> dep) =<<
+          md5' dep
 
 redo :: String -> IO ()
 redo target =
@@ -35,7 +54,7 @@ redo target =
        traceShow' `liftM`
        (upToDate metaDepsDir)
      unless upToDate' $
-       maybe printMissing redo' =<<
+       maybe missingDo redo' =<<
        redoPath target
   where redo' :: FilePath -> IO ()
         redo' path =
@@ -51,9 +70,11 @@ redo target =
                     hPutStrLn stderr $ "Redo script exited with non-zero exit code: " ++
                       show code
                     return ()
-        printMissing :: IO ()
-        printMissing = error $ "No .do file found for targets '" ++ target ++
-                                                                    "'"
+        missingDo :: IO ()
+        missingDo =
+          do exists <- doesFileExist target
+             unless exists $ error $ "No .do file found for targets '" ++ target ++
+               "'"
         redoCommand :: String -> String
         redoCommand path =
           unwords ["sh",path,"0",takeBaseName target,tmp,">",tmp]
@@ -61,7 +82,7 @@ redo target =
         runShell cmd =
           do oldEnv <- getEnvironment
              let newEnv =
-                   extendEnv ("REDO_TARGET",target) oldEnv
+                   extendEnv (redoTargetKey,target) oldEnv
              (_,_,_,processHandle) <-
                createProcess $
                (shell cmd) {env = Just newEnv}
@@ -76,7 +97,7 @@ redo target =
           insert k v $
           fromList oldEnv
         tmp = target ++ "---redoing"
-        metaDepsDir = ".redo" </> target
+        metaDepsDir = metaDir </> target
 
 redoPath :: FilePath -> IO (Maybe FilePath)
 redoPath target =
@@ -107,8 +128,9 @@ upToDate metaDepsDir =
                     newMd5 <- md5' dep
                     return $ oldMd5 == newMd5)
                 (\e -> return $ ioeGetErrorType e == InappropriateType -- (\e -> return if ioeGetErrorType e == InappropriateType)
-                 )-- then True -- Treat it as a correct dependency, even though it is not a dependency. It's a way of ignoring '.' and '..' directories.
-                  -- else False)
+                                                                      -- then True -- Treat it as a correct dependency, even though it is not a dependency. It's a way of ignoring '.' and '..' directories.
+                                                                      -- else False)
+                 )
 
 recreateDirectory :: FilePath -> IO ()
 recreateDirectory path =
