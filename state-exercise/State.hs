@@ -35,5 +35,5 @@ instance Monad (State s) where
   return = pure
   -- (>>=) :: (State s) a -> (a -> (State s) b) -> (State s) b
   (State stA) >>= fn = (State (\s -> let (a,st2) = stA s
-                                             (State g) = fn a
-                                         in g st2))
+                                         (State g) = fn a
+                                     in g st2))
