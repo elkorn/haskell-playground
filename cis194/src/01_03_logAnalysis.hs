@@ -11,6 +11,8 @@ main =
      print $
        (length . inOrder . build $ msgs) ==
        length (filter isKnown msgs)
+     testParse parse 10 "sample.log" >>= print
+     testWhatWentWrong parse whatWentWrong "sample.log" >>= print
 
 isKnown :: LogMessage -> Bool
 isKnown (LogMessage _ _ _) = True
@@ -68,3 +70,14 @@ inOrder (Node l msg r) =
   inOrder l ++
   [msg] ++
   inOrder r
+
+isCriticalError :: LogMessage -> Bool
+isCriticalError (LogMessage (Error severity) _ _) = severity > 50
+isCriticalError _ = False
+
+getContent :: LogMessage -> String
+getContent (LogMessage _ _ str) = str
+getContent (Unknown str) = str
+
+whatWentWrong :: [LogMessage] -> [String]
+whatWentWrong = (map getContent) . (filter isCriticalError)
