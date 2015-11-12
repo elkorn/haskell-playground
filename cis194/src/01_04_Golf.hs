@@ -9,7 +9,8 @@ skips :: (Eq a)
 skips xs =
   map (\x ->
          everynth ((fromJust $
-                   elemIndex x xs) + 1)
+                    elemIndex x xs) +
+                   1)
                   xs)
       xs
 
@@ -20,3 +21,10 @@ everynth n xs =
       y :
       (everynth n ys)
     [] -> []
+
+localMaxima :: [Integer] -> [Integer]
+localMaxima (x:y:z:zs)
+  | y > x && y > z = y : rest
+  | otherwise = rest
+  where rest = (localMaxima $ y : z : zs)
+localMaxima _ = []

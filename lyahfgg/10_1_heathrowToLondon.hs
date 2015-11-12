@@ -11,16 +11,19 @@
 main = do
     contents <- getContents
     let threes = groupsOf 3 (map read $ lines contents)
-        roadNetwork = map (\[a,b,c] -> Section a b c) threes
-        (path, pathCost) = optimalPath roadNetwork
-        pathString = concat $ map (show . fst) path
+        roadNetwork = map
+                (\[a,b,c] ->
+                      Section a b c)
+                threes
+        (path,pathCost) = optimalPath roadNetwork
+        pathString = concat $
+            map (show . fst) path
     putStrLn $ "The best path to take is: " ++ pathString
-    putStrLn $ "Its cost is: " ++ show pathCost ++ " minutes"
-    -- let p = optimalPath heathrowToLondon
-    -- print p
-    -- print $
-    --     p ==
-    --     [(B, 10), (C, 30), (A, 5), (C, 20), (B, 2), (B, 8), (C, 0)]
+    putStrLn $ "Its cost is: " ++ show pathCost ++ " minutes"-- let p = optimalPath heathrowToLondon
+                                                             -- print p
+                                                             -- print $
+                                                             --     p ==
+                                                             --     [(B, 10), (C, 30), (A, 5), (C, 20), (B, 2), (B, 8), (C, 0)]
 
 data Section = Section
     { getA :: Int
@@ -84,4 +87,5 @@ roadStep (pathA,costA,pathB,costB) (Section a b c) = let forwardCostToA = costA 
 groupsOf :: Int -> [a] -> [[a]]
 groupsOf 0 _ = undefined
 groupsOf _ [] = []
-groupsOf n xs = take n xs : groupsOf n (drop n xs)
+groupsOf n xs = take n xs :
+    groupsOf n (drop n xs)
