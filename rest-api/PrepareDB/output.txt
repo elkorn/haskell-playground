@@ -1,0 +1,14 @@
+➜  rest-api git:(master) ✗ cabal build prepare-db -v
+Using a sandbox located at /home/elkorn/Code/haskell/rest-api/.cabal-sandbox
+Reading available packages...
+Reading installed packages...
+/usr/bin/ghc-pkg dump '--package-db=/home/elkorn/Code/haskell/rest-api/.cabal-sandbox/x86_64-linux-ghc-7.10.1-packages.conf.d' -v0
+/usr/bin/ghc --print-libdir
+Found no modified add-source deps.
+Component build order: executable 'prepare-db'
+creating dist/build
+creating dist/build/autogen
+/usr/bin/ghc-pkg init dist/package.conf.inplace
+Preprocessing executable 'prepare-db' for rest-api-0.1...
+cabal: can't find source for PrepareDB/Internal/ColumnType in PrepareDB,
+dist/build/autogen

@@ -1,0 +1,49 @@
+➜  rest-api git:(master) ✗ tree .
+.
+├── cabal.sandbox.config
+├── dist
+│   ├── build
+│   │   ├── autogen
+│   │   │   ├── cabal_macros.h
+│   │   │   └── Paths_rest_api.hs
+│   │   ├── prepare-db
+│   │   │   └── prepare-db-tmp
+│   │   │       ├── PrepareDB
+│   │   │       │   ├── Main.hi
+│   │   │       │   └── Main.o
+│   │   │       ├── PrepareDB.hi
+│   │   │       └── PrepareDB.o
+│   │   └── rest-api
+│   │       ├── rest-api
+│   │       └── rest-api-tmp
+│   │           ├── Main.hi
+│   │           └── Main.o
+│   ├── package.conf.inplace
+│   │   └── package.cache
+│   ├── setup-config
+│   ├── setup-config.ghc-mod.cabal-components
+│   ├── setup-config.ghc-mod.package-db-stack
+│   ├── setup-config.ghc-mod.package-options
+│   └── setup-config.ghc-mod.resolved-components
+├── LICENSE
+├── log
+│   ├── access.log
+│   └── error.log
+├── Main.hs
+├── PrepareDB
+│   ├── Internal
+│   │   ├── Column.hs
+│   │   ├── ColumnType.hs
+│   │   └── Table.hs
+│   ├── Main.hs
+│   ├── output.txt
+│   ├── Tables
+│   │   └── Recipe.hs
+│   └── tree.txt
+├── rest-api.cabal
+├── Setup.hs
+├── snap -> .cabal-sandbox/bin/snap
+└── src
+    └── Main.hs
+
+14 directories, 31 files
