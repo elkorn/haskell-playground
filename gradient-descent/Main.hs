@@ -1,7 +1,16 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 module Main where
 
 import GradientDescent
+
+-- stop condition respecting given error tolerance
+stopCondition :: (Double -> Double)
+                -> Double
+                -> StopCondition (Double -> Double)
+stopCondition f tolerance =
+    let stop (Arg prev) (Arg cur) = abs (f prev - f cur) < tolerance
+    in StopWhen stop
 
 instance Floating a => GradientDescent (a -> a) where
     -- parameter for a function is its argument.
@@ -24,14 +33,11 @@ instance Floating a => GradientDescent (a -> a) where
         where
             takeStep params = let gradients = gradient function params 
                                in moveInParameterSpace (-alpha) gradients params
-    -- stop condition respecting given error tolerance
-    stopCondition :: (Double -> Double) 
-                  -> Double 
-                  -> StopCondition (Double -> Double)
-    stopCondition f tolerance = 
-        let stop (Arg prev) (Arg cur) = abs (f prev - f cur) < tolerance
-        in StopWhen stop
-
-
 main :: IO ()
-main = print "Need to make this work."
+main = do
+  let function x = x^2 + 3*x
+  let step = 1e-1
+  let tolerance = 1e-4
+  let initialValue = 12.0
+  print $ "Calculating..."
+  print $ unArg $ gradientDescent function (stopCondition function tolerance) step (Arg initialValue)
