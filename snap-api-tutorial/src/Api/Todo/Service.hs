@@ -2,9 +2,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Api.Services.TodoService where
+module Api.Todo.Service where
 
-import Api.Types (Todo(Todo), Route)
+import Api.Todo.Model (Todo)
+import Api.Todo.Serialization ()
+import Api.Todo.Storage ()
+import Api.Types (Route)
 
 import Control.Lens (makeLenses)
 import Control.Monad.State.Class (get)
@@ -53,5 +56,6 @@ todoServiceInit =
      return $
        TodoService postgres
 
+-- Required for `execute` and `query_` usage.
 instance HasPostgres (Handler b TodoService) where
   getPostgresState = with pg get
