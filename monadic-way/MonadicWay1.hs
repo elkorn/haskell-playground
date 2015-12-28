@@ -153,6 +153,92 @@ eval_IO (Add t u) = do                  -- the `do` notation sugar-coats the fol
   print_IO (formatLine (Add t u) result) -- `>>= \_ -> print_IO(...)`
   return result                          -- `>>= \result -> createEval_IO result`
 
+-- VARIANT WITH ERROR HANDLING
+
+data M a = Raise Exception
+         | Return a
+           deriving (Show)
+type Exception = String
+
+evalE :: Term -> M Int
+evalE (Con a) = Return a
+evalE (Add a b) =
+  case evalE a of
+    Raise e -> Raise e
+    Return a ->
+      case evalE b of
+        Raise e -> Raise e
+        Return b ->
+          if result == 42
+             then Raise "The ultimate answer. Goodbye!"
+             else Return result
+             where result = a + b
+
+-- Using a custom type for extracting all the pattern matching
+-- out of the core logic.
+data M1 a = Except Exception
+          | Ok {showM :: a}
+            deriving (Show)
+
+instance Monad M1 where
+  return = Ok
+  m >>= f = case m of
+    Except e -> Except e
+    Ok a -> f a
+
+raise :: Exception -> M1 a
+raise = Except
+
+eval_ME :: Term -> M1 Int
+eval_ME (Con a) = return a  
+eval_ME (Add t u) = do
+    a <- eval_ME t
+    b <- eval_ME u
+    let result = a + b
+    if result == 42
+        then Except "The ultimate answer. Goodbye!"
+        else Ok result
+
+-- COMBINING THE OUTPUT-PRODUCING EVALUATOR WITH THE EXCEPTION-PRODUCING ONE
+data M2 a = Ex Exception
+          | Done {unpack :: (a, O)}
+            deriving (Show)
+
+instance Monad M2 where
+  return a = Done (a, "")
+  -- We are just offloading all of the concerns related to the computation
+  -- into the monad definition. It seems to me as this is the case where monad
+  -- stacks would be viable.
+  m >>= f = case m of
+    Ex e -> Ex e
+    Done (a, x) -> case (f a) of
+      Ex e1 -> Ex e1
+      Done (b, y) -> Done (b, x++y)
+
+-- Convenience method for raising an exception.
+raise_IOE :: Exception -> M2 a
+raise_IOE = Ex
+
+-- Convenience method for putting a string into the data type instance.
+print_IOE :: O -> M2 ()
+print_IOE x = Done ((), x)
+
+eval_IOE :: Term -> M2 Int
+eval_IOE (Con a) = do
+  print_IOE $ formatLine (Con a) a
+  return a
+eval_IOE (Add t u) = do
+  a <- eval_IOE t
+  b <- eval_IOE u
+  let result = a + b -- We do not need to use `let ... in` because all bound
+                     -- variables remain bound in the context of a `do`
+                     -- procedure.
+  let out = formatLine (Add t u) result
+  print_IOE out
+  if result == 42
+     then raise_IOE $ out ++ "The ultimate answer. Goodbye!"
+     else return result
+
 main :: IO ()
 main = do
     let term = Add (Con 5) (Con 6)
@@ -162,3 +248,5 @@ main = do
     putStrLn $ show $ evalM term
     putStrLn $ show $ evalM_4 term
     putStrLn $ show $ eval_IO term
+    putStrLn $ show $ eval_ME term
+    putStrLn $ show $ eval_IOE term
