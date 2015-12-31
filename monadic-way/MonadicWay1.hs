@@ -1,17 +1,12 @@
-module MonadicWay1 where
-data Term
-    = Con Int
-    | Add Term
-          Term
-    deriving (Show)
+module MonadicWay.One where
+
+import MonadicWay.Shared
+
 eval :: Term -> Int
 eval (Con a) = a
 eval (Add a b) = eval a + eval b
-type MOut a = (a, Output)
-type Output = String
 
-formatLine :: Term -> Int -> Output
-formatLine t a = "eval (" ++ show t ++ ") <= " ++ show a ++ " - "
+type MOut a = (a, Output)
 
 evalO :: Term -> MOut Int
 evalO (Con a) = ( a
@@ -102,7 +97,6 @@ evalM (Add t u) = evalM t `bindM` \a ->
 --- FINAL VERSION
 
 newtype Eval_IO a = Eval_IO (a, O) deriving (Show)
-type O = String
 
 type Evaluator a = Term -> Eval_IO a
 
@@ -158,7 +152,6 @@ eval_IO (Add t u) = do                  -- the `do` notation sugar-coats the fol
 data M a = Raise Exception
          | Return a
            deriving (Show)
-type Exception = String
 
 evalE :: Term -> M Int
 evalE (Con a) = Return a
