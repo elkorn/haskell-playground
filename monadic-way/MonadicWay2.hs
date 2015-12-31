@@ -64,7 +64,7 @@ instance Monad MTa where
   return = mkMTa
   m >>= f = bindMTa m f
   -- or
-  -- (>>=) = bindMTa
+  -- (>>=) = bindMT
 
 instance Functor MTa where
   fmap _ (FailTa a) = FailTa a
@@ -197,6 +197,125 @@ runEvalExecTb exp = case execState ("", 0) (evalTb_SIOE exp) of
   FailTb err -> err
   DoneTb (output, result) -> "Result = " ++ show result ++
                              "; Output = " ++ output
+-- `StateT` KEEPS OUTPUT, COUNTER AND DEBUG - MONADIC EVALUATOR USED JUST FOR
+-- EXCEPTIONS
+
+data MT a = FailT Exception
+          | DoneT {unpackDoneT :: a}
+            deriving Show
+
+type IOStack = [Output]
+
+newtype StateTIO = StateTIO
+    {
+    unpackStateTIO :: (IOStack, Exception, Int)
+    } deriving Show
+
+mkMT :: a -> MT a
+mkMT value = DoneT value
+
+bindMT monad doNext = case monad of
+  FailT err -> FailT err
+  DoneT result -> doNext result
+
+instance Monad MT where
+  return = mkMT
+  (>>=)  = bindMT
+
+instance Functor MT where
+  fmap _ (FailT err) = FailT err
+  fmap f (DoneT result) = DoneT $ f result
+
+-- The difference between `stopExecT_SIOE` and `catchT_SIOE` is that
+-- `stopExecT_SIOE` just returns a failure, prompting the driving code to bail
+-- on pattern matches. `catchT_SIOE` on the other hand produces a `DoneT`
+-- instance, so the driving code is proceeding normally, only the error message
+-- is extended.
+stopExecT_SIOE :: Output -> StateT StateTIO MT Int
+stopExecT_SIOE err = StateT (\_ -> FailT err)
+
+catchT_SIOE :: Output -> StateT StateTIO MT ()
+catchT_SIOE err = StateT (\(StateTIO (output, error, state)) ->
+                           return (
+                             (),
+                             StateTIO (output, "Exception = " ++ err ++
+                                       "; Iteration = " ++ show state, state)))
+printT_SIOE :: Output -> StateT StateTIO MT ()
+printT_SIOE out = StateT (\(StateTIO (outStack, error, state)) ->
+                           return ((), StateTIO (out:outStack, error, state)))
+
+incTStateIO :: StateT StateTIO MT ()
+incTStateIO = StateT (\(StateTIO (outStack, error, state)) ->
+                       return ((), StateTIO (outStack, error, state + 1)))
+evaluateT_SIOE :: Int -> Output -> StateT StateTIO MT Int
+evaluateT_SIOE result output = do
+  incTStateIO
+  printT_SIOE output
+  case result of
+    42 -> do
+      catchT_SIOE "The ultimate answer. Goodbye!"
+      return result
+    11 -> stopExecT_SIOE "Number 11 is forbidden."
+    otherwise -> return result
+  
+evalT_SIOE :: Term -> StateT StateTIO MT Int
+evalT_SIOE con@(Con a) = evaluateT_SIOE a $ formatLine con a
+evalT_SIOE add@(Add t u) = do
+  a <- evalT_SIOE t
+  b <- evalT_SIOE u
+  let result = a + b
+  evaluateT_SIOE result $ formatLine add result
+
+runEvalRunT1 :: Term -> String
+runEvalRunT1 exp = case runStateT
+                           (evalT_SIOE exp)
+                           (StateTIO ([], "", 0)) of
+        FailT e -> e
+        DoneT (result,StateTIO (outStack,error,state)) -> unwords
+                [ "Result ="
+                , show result
+                , "; Iteration ="
+                , show state
+                , "; Output ="
+                , show outStack
+                , "; Errors = "
+                , error]
+
+runEvalRunT2 :: Term -> String
+runEvalRunT2 exp = case runState
+                           (StateTIO ([], "", 0))
+                           (evalT_SIOE exp) of
+        FailT e -> e
+        DoneT (result,StateTIO (outStack,error,state)) -> unwords
+                [ "Result ="
+                , show result
+                , "; Iteration ="
+                , show state
+                , "; Output ="
+                , show outStack
+                , "; Errors = "
+                , error]
+
+runEvalEvalT :: Term -> String
+runEvalEvalT exp = case evalState
+                           (StateTIO ([], "", 0))
+                           (evalT_SIOE exp) of
+        FailT e -> e
+        DoneT result -> "Result = " ++ show result
+
+runEvalExecT :: Term -> String
+runEvalExecT exp = case execState
+                           (StateTIO ([], "", 0))
+                           (evalT_SIOE exp) of
+        FailT e -> e
+        DoneT (StateTIO (outStack, error, state)) -> unwords
+                [ "; Iteration ="
+                , show state
+                , "; Output ="
+                , show outStack
+                , "; Errors = "
+                , error]
+
 main :: IO ()
 main = do
     let term = Add (Con 5) (Con 6)
@@ -204,6 +323,7 @@ main = do
     let term42b = Add (Con 0) (Con 42)
     let term42c = Add (Con 40) (Con 2)
     let evals = [ runEvalRunTa1, runEvalRunTa2, runEvalEvalTa, runEvalExecTa,
-                  runEvalRunTb1, runEvalRunTb2, runEvalEvalTb, runEvalExecTb ]
+                  runEvalRunTb1, runEvalRunTb2, runEvalEvalTb, runEvalExecTb,
+                  runEvalRunT1, runEvalRunT2, runEvalEvalT, runEvalExecT ]
     let terms = [term, term42a, term42b, term42c]
     mapM_ putStrLn $ evals <*> terms
