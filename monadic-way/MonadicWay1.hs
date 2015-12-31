@@ -328,9 +328,67 @@ eval_SIO add@(Add t u) = do
   print_SIO (formatLine add result)
   return result
 
+-- MONADIC, STATEFUL VARIANT WITH OUTPUT AND ERROR HANDLING
+
+data EvaluationResult a =
+  Good a State Output
+  | Bad Exception State Output 
+    deriving Show
+
+newtype Eval_SIOE a = SIOE { runSIOE :: State -> EvaluationResult a }
+
+raise_SIOE e = SIOE (\s -> Bad e s "")
+
+print_SIOE :: String -> Eval_SIOE ()
+print_SIOE out = SIOE (\s -> Good () s out)
+
+incSIOEState :: Eval_SIOE()
+incSIOEState = SIOE (\s -> Good () (s+1) "")
+
+mkMSIOE :: a -> Eval_SIOE a
+mkMSIOE int = SIOE (\s -> Good int s "")
+
+bindMSIOE :: Eval_SIOE a -> (a -> Eval_SIOE b) -> Eval_SIOE b
+bindMSIOE monad doNext = SIOE $ \initialState ->
+  case runSIOE monad initialState of
+    Good oldInt oldState oldOutput ->
+      case runSIOE (doNext oldInt) oldState of
+        Good newInt newState newOutput -> Good newInt newState (newOutput ++ oldOutput)
+  -- reconstruction of the Bad instances is required for type conversion.
+        Bad newError newState newOutput ->Bad newError newState (newOutput ++ oldOutput) 
+    Bad oldError oldState oldOutput -> Bad oldError oldState oldOutput
+
+instance Monad Eval_SIOE where
+  return = mkMSIOE
+  m >>= f = bindMSIOE m f
+
+evalMSIOE :: Term -> Eval_SIOE Int 
+evalMSIOE con@(Con a) = do
+  incSIOEState
+  let out = formatLine con a
+  print_SIOE out
+  if a == 42 then raise_SIOE $ out ++ "The ultimate answer. Goodbye!"
+             else return a
+evalMSIOE add@(Add t u) = do
+  a <- evalMSIOE t
+  b <- evalMSIOE u
+  let result = a + b
+  let out = formatLine add result
+  incSIOEState
+  if result == 42 then raise_SIOE $  out ++ "The ultimate answer. Goodbye!"
+                  else return result
+
+runEvalMSIOE :: Term -> String
+runEvalMSIOE exp = case runSIOE (evalMSIOE exp) 0 of
+  Bad error state output -> "Error: " ++ show error ++
+                            " - at iteration " ++ show state ++
+                            " - stack: " ++ show output
+  good@(Good _ _ _) -> show good
+  
 main :: IO ()
 main = do
     let term = Add (Con 5) (Con 6)
+    let term42 = Add (Con 40) (Con 2)
     putStrLn $ show $ evalO term
     putStrLn $ show $ evaluator term
     putStrLn $ show $ evalM_2 term
@@ -343,3 +401,7 @@ main = do
     putStrLn $ show $ unpackMSandRun (evalMS term) 0
     putStrLn $ show $ unpackMSandRun (evalMS2 term) 0
     putStrLn $ show $ unpackMSIOandRun (eval_SIO term) 0
+    putStrLn $ runEvalMSIOE term
+    putStrLn $ runEvalMSIOE (Add (Con 42) (Con 0))
+    putStrLn $ runEvalMSIOE (Add (Con 0) (Con 42))
+    putStrLn $ runEvalMSIOE term42
