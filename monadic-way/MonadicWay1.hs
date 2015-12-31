@@ -284,12 +284,49 @@ evalMS (Add t u) = do
   return (a + b)
 
 evalMS2 :: Term -> MS Int
-evalMS2 (Con a) = do incState 
-                     mkMS a   
+evalMS2 (Con a) = incState >>= (\_ -> mkMS a)
 evalMS2 (Add t u) =
   evalMS t >>=
   (\a -> evalMS u >>=
          (\b -> incState >>= \_ -> return (a + b)))
+
+-- MONADIC, STATEFUL VARIANT WITH OUTPUT
+
+newtype Eval_SIO a = Eval_SIO { unpackMSIOandRun :: State -> (a, State, Output) }
+
+bindMSIO :: Eval_SIO a -> (a -> Eval_SIO b) -> Eval_SIO b
+bindMSIO monad doNext =
+  Eval_SIO (\initialState ->
+             let (oldInt, oldState, oldOutput) = unpackMSIOandRun monad initialState
+                 (newInt, newState, newOutput) = unpackMSIOandRun (doNext oldInt) oldState
+             in  (newInt, newState, oldOutput ++ newOutput))
+
+mkMSIO :: a -> Eval_SIO a
+mkMSIO int = Eval_SIO (\state -> (int, state, ""))
+
+instance Monad Eval_SIO where
+  return = mkMSIO
+  m >>= f = bindMSIO m f
+
+-- put a string inside an Eval_SIO instance.
+print_SIO :: Output -> Eval_SIO ()
+print_SIO output = Eval_SIO (\s -> ((), s, output))
+
+incSIOState :: Eval_SIO ()
+incSIOState = Eval_SIO (\state -> ((), state+1, ""))
+
+eval_SIO :: Term -> Eval_SIO Int
+eval_SIO con@(Con a) = do
+  incSIOState
+  print_SIO (formatLine con a)
+  return a
+eval_SIO add@(Add t u) = do
+  a <- eval_SIO t
+  b <- eval_SIO u
+  let result = a + b
+  incSIOState
+  print_SIO (formatLine add result)
+  return result
 
 main :: IO ()
 main = do
@@ -305,3 +342,4 @@ main = do
     putStrLn $ show $ evalNMS term 0
     putStrLn $ show $ unpackMSandRun (evalMS term) 0
     putStrLn $ show $ unpackMSandRun (evalMS2 term) 0
+    putStrLn $ show $ unpackMSIOandRun (eval_SIO term) 0
