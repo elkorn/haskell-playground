@@ -253,6 +253,43 @@ evalNMS (Add t u) x = let
   (b, z) = evalNMS u y
   in (a + b, z + 1)
 
+newtype MS a = MS { unpackMSandRun :: (State -> (a, State)) }
+
+-- Creating the monad with an integer inside.
+-- Takes an integer and applies the MS type constructor to an anonymous function that feeds the integer to a state.
+mkMS :: a -> MS a
+mkMS int = MS (\x -> (int, x))
+
+bindMS :: MS a -> (a -> MS b) -> MS b
+bindMS monad doNext = MS $ \initialState ->
+  let (oldInt, oldState) = unpackMSandRun monad initialState
+      (newInt, newState) = unpackMSandRun (doNext oldInt) oldState
+  in  (newInt, newState)
+
+instance Monad MS where
+  return = mkMS
+  m >>= f = bindMS m f
+
+incState :: MS ()
+incState = MS (\s -> ((), s+1))
+
+evalMS :: Term -> MS Int
+evalMS (Con a) = do incState -- increase the count
+                    mkMS a   -- return `a`, given an initial state we get just
+                    -- the value with an incremented counter.
+evalMS (Add t u) = do
+  a <- evalMS t 
+  b <- evalMS u
+  incState
+  return (a + b)
+
+evalMS2 :: Term -> MS Int
+evalMS2 (Con a) = do incState 
+                     mkMS a   
+evalMS2 (Add t u) =
+  evalMS t >>=
+  (\a -> evalMS u >>=
+         (\b -> incState >>= \_ -> return (a + b)))
 
 main :: IO ()
 main = do
@@ -266,3 +303,5 @@ main = do
     putStrLn $ show $ eval_ME term
     putStrLn $ show $ eval_IOE term
     putStrLn $ show $ evalNMS term 0
+    putStrLn $ show $ unpackMSandRun (evalMS term) 0
+    putStrLn $ show $ unpackMSandRun (evalMS2 term) 0
