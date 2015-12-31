@@ -239,6 +239,21 @@ eval_IOE (Add t u) = do
      then raise_IOE $ out ++ "The ultimate answer. Goodbye!"
      else return result
 
+-- STATEFUL VARIANT
+-- non-monadic
+type St a = State -> (a, State)
+type State = Int
+
+evalNMS :: Term -> St Int
+-- Note that this is equivalent to `evalNMS :: Term -> State -> (Int, State)`.
+-- Thus the function actually takes two arguments.
+evalNMS (Con a) x = (a, x+1)
+evalNMS (Add t u) x = let
+  (a, y) = evalNMS t x
+  (b, z) = evalNMS u y
+  in (a + b, z + 1)
+
+
 main :: IO ()
 main = do
     let term = Add (Con 5) (Con 6)
@@ -250,3 +265,4 @@ main = do
     putStrLn $ show $ eval_IO term
     putStrLn $ show $ eval_ME term
     putStrLn $ show $ eval_IOE term
+    putStrLn $ show $ evalNMS term 0
