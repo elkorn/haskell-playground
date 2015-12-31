@@ -204,8 +204,6 @@ data MT a = FailT Exception
           | DoneT {unpackDoneT :: a}
             deriving Show
 
-type IOStack = [Output]
-
 newtype StateTIO = StateTIO
     {
     unpackStateTIO :: (IOStack, Exception, Int)
