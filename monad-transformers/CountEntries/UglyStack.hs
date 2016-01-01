@@ -1,6 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module CountEntries.UglyStack
-       (runApp, constrainedCount, runApp1, constrainedCount1) where{-
+       (runApp, constrainedCount, runApp1, constrainedCount1, runApp2, constrainedCount2) where{-
     The result of stacking a monad transformer on a monad is another monad.
     This implies the possibility of infinite monad stacking.
     It is a common approach, as the purpose of monad transformers is to combine
@@ -21,6 +21,7 @@ module CountEntries.UglyStack
 import System.Directory
 import System.FilePath
 import Control.Monad.Reader
+import Control.Monad.Writer
 import Control.Monad.State
 
 import CountEntries.Classic (listDirectory)
@@ -72,7 +73,7 @@ newtype MyApp a = MyA
     { runA :: ReaderT AppConfig (StateT AppState IO) a
     } deriving (Monad,MonadIO,MonadReader AppConfig,MonadState AppState)
 
--- EX. 1: Modify the `App` type synonym to swap the order of `ReaderT` and `StateT`.
+-- Ex. 1: Modify the `App` type synonym to swap the order of `ReaderT` and `StateT`.
 
 type App1 = StateT AppState (ReaderT AppConfig IO) -- `StateT r m`
 
@@ -104,3 +105,32 @@ constrainedCount1' curDepth path = do
          constrainedCount1' newDepth newPath
        else return []
   return $ (path, length contents) : concat rest
+
+-- Ex. 2: Add the `WriterT` transformer to the `App` monad transformer stack.
+-- Ex. 3: Rewrite the `constrainedCount` function to record results using the `WriterT`.
+type Result = (FilePath, Int)
+type App2 = WriterT [Result] (ReaderT AppConfig (StateT AppState IO)) -- `ReaderT r m`
+
+runApp2 :: App2 a -> Int -> IO ((a, [Result]), AppState)
+runApp2 k maxDepth =
+  let config = AppConfig maxDepth
+      state = AppState 0
+  in  runStateT (runReaderT (runWriterT k) config) state
+
+constrainedCount2 :: FilePath -> App2 ()
+constrainedCount2 = constrainedCount2' 0
+
+constrainedCount2' :: Int -> FilePath -> App2 ()
+constrainedCount2' curDepth path = do
+  contents <- liftIO . listDirectory $ path
+  cfg <- ask
+  tell [(path, length contents)] -- instead of returning data
+  forM_ contents $ \name -> do -- results can be dropped, they are aggregated along the way.
+    let newPath = path </> name
+    isDir <- liftIO $ doesDirectoryExist newPath
+    when (isDir && curDepth < cfgMaxDepth cfg) $ do
+        let newDepth = curDepth + 1
+        state <- get
+        when (stDeepestReached state < newDepth) $
+            put state { stDeepestReached = newDepth } -- I don't know this notation.
+        constrainedCount2' newDepth newPath
