@@ -1,6 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module CountEntries.UglyStack (runApp, constrainedCount) where
-{-
+module CountEntries.UglyStack
+       (runApp, constrainedCount, runApp1, constrainedCount1) where{-
     The result of stacking a monad transformer on a monad is another monad.
     This implies the possibility of infinite monad stacking.
     It is a common approach, as the purpose of monad transformers is to combine
@@ -71,3 +71,36 @@ constrainedCount' curDepth path = do
 newtype MyApp a = MyA
     { runA :: ReaderT AppConfig (StateT AppState IO) a
     } deriving (Monad,MonadIO,MonadReader AppConfig,MonadState AppState)
+
+-- EX. 1: Modify the `App` type synonym to swap the order of `ReaderT` and `StateT`.
+
+type App1 = StateT AppState (ReaderT AppConfig IO) -- `StateT r m`
+
+runApp1 :: App1 a -> Int -> IO (a, AppState)
+runApp1 k maxDepth =
+  let config = AppConfig maxDepth
+      state = AppState 0
+  in runReaderT (runStateT k state) config
+  --      |         |
+  --      |     Removes `StateT` transformer wrapper.
+  --  Removes `ReaderT` transformer wrapper.
+
+constrainedCount1 :: FilePath -> App1 [(FilePath, Int)]
+constrainedCount1 = constrainedCount1' 0
+
+constrainedCount1' :: Int -> FilePath -> App1 [(FilePath, Int)]
+constrainedCount1' curDepth path = do
+  contents <- liftIO . listDirectory $ path
+  cfg <- ask
+  rest <- forM contents $ \name -> do
+    let newPath = path </> name
+    isDir <- liftIO $ doesDirectoryExist newPath
+    if isDir && curDepth < cfgMaxDepth cfg
+       then do
+         let newDepth = curDepth + 1
+         state <- get
+         when (stDeepestReached state < newDepth) $
+           put state { stDeepestReached = newDepth } -- I don't know this notation.
+         constrainedCount1' newDepth newPath
+       else return []
+  return $ (path, length contents) : concat rest
