@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module CountEntries.UglyStack
-       (runApp, constrainedCount, runApp1, constrainedCount1, runApp2, constrainedCount2) where{-
+       (runApp, constrainedCount, runApp1, constrainedCount1, runApp2, constrainedCount2) where
+{-
     The result of stacking a monad transformer on a monad is another monad.
     This implies the possibility of infinite monad stacking.
     It is a common approach, as the purpose of monad transformers is to combine
