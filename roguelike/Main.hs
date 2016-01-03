@@ -2,14 +2,15 @@ module Roguelike where
 
 import Prelude hiding (Either(..))
 
-import Types
 import Level
 import LevelGen
-
+import Types
 import UI.Terminal
+import Utils
 
 main :: IO ()
 main = do
+    blah
     customLevel <- generateLevel $ LevelSpec Small
     let world = startingState
             { worldLevel = customLevel
@@ -49,19 +50,6 @@ directionToCoordinates Left = (-1, 0)
 directionToCoordinates Right  = (1, 0)
 directionToCoordinates Up  = (0, -1)
 directionToCoordinates Down = (0, 1)
-
-(|+|) :: Coordinates -> Coordinates -> Coordinates
-(x1, y1) |+| (x2, y2) = (x1+x2,y1+y2)
-
-clamp :: Ord a => a -> a -> a -> a
-clamp val _min _max = max _min $ min _max val
-
--- TODO: read screen size from config
-clampCoordinatesToLevel :: Coordinates -> Level -> Coordinates
-clampCoordinatesToLevel (oldX,oldY) (Level _ _ _ _ (maxX, maxY) _ _)= let
-  newX = clamp oldX 0 maxX
-  newY = clamp oldY 0 maxY
-  in (newX, newY)
 
 handleDirection :: WorldState -> Direction -> WorldState
 handleDirection world@(World hero@(Hero position _ _ _ oldPosition _ _) _ level _) direction =
