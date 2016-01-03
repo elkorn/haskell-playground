@@ -6,6 +6,7 @@ import qualified Data.Map as M
 import Level
 import System.Random (randomRIO)
 import Types
+import Utils
 
 type RoomLocationInGrid = (Int, Int)
 type RectBoundaries = (Coordinates, Coordinates)
@@ -16,7 +17,7 @@ data Room = Room
     { roomCoordinates :: RectBoundaries
     -- , roomLocationInGrid :: RoomLocationInGrid
     , roomConnections :: S.Set RoomLocationInGrid
-    } deriving Show
+    } deriving (Ord, Eq, Show)
 
 minWidth = 0
 minHeight = 0
@@ -42,7 +43,9 @@ generateRooms level existingRooms 0 = return existingRooms
 generateRooms level existingRooms n = do
   let (maxX, maxY) = levelMax level
   room <- generateRoom level (maxX `div` 3, maxY `div` 3)
-  if any (intersects $ roomCoordinates room) $ map roomCoordinates existingRooms
+  let newRoomIntersectsExistingOnes = any (intersects $ roomCoordinates room) $
+                                      map roomCoordinates existingRooms
+  if newRoomIntersectsExistingOnes
     then generateRooms level existingRooms n
     else generateRooms level (room:existingRooms) (n-1)
 
@@ -51,9 +54,12 @@ generateLevel spec = do
     let baseLevel = emptyLevel
             { levelMax = (80, 40)
             }
-    rooms <- generateRooms baseLevel [] 5
+    rooms <- generateRooms baseLevel [] 2
+    adjacency <- generateRoomAdjacency rooms baseLevel
+    print $ map (\(room, adj) -> (fst . roomCoordinates $ room, map (fst . roomCoordinates) rooms)) $ M.toList $ M.filter (\x -> length x > 0) adjacency
+    putStrLn " "
     return $
-        -- updateLevelMax $
+        updateLevelMax $
         baseLevel
         { levelTiles = foldl M.union M.empty $
           map roomToTiles rooms
@@ -71,3 +77,32 @@ roomToTiles (Room ((startX, startY), (endX, endY)) _) =
       if isBoundary x startX endX || isBoundary y startY endY
         then Wall
         else Floor
+
+generateRoomAdjacency :: [Room] -> Level -> IO (M.Map Room [Room])
+generateRoomAdjacency rooms level = do
+  print $ roomCoordinates (rooms !! 0)
+  print $ grow 1 $ roomCoordinates (rooms !! 0)
+  print $ roomCoordinates (rooms !! 1)
+  print $ grow 1 $ roomCoordinates (rooms !! 1)
+  print $ intersects (grow 1 $ roomCoordinates (rooms !! 0)) (grow 1 $ roomCoordinates (rooms !! 1))
+  print $ intersects (grow 1 $ roomCoordinates (rooms !! 1)) (grow 1 $ roomCoordinates (rooms !! 0))
+  print $ isAdjacent (rooms !! 0) (rooms !! 1)
+  print $ getAdjacents (rooms !! 0)
+  print $ getAdjacents (rooms !! 1)
+  return $ M.fromList $ zip rooms $ map getAdjacents rooms 
+  where
+    getAdjacents :: Room -> [Room] 
+    getAdjacents room = filter (isAdjacent room) rooms
+    isAdjacent :: Room -> Room -> Bool
+    isAdjacent roomA roomB =
+      intersects intersectionRangeA intersectionRangeB
+      where 
+        intersectionRangeA = grow 1 $ roomCoordinates roomA
+        intersectionRangeB = grow 1 $ roomCoordinates roomB
+    grow :: Int -> RectBoundaries -> RectBoundaries
+    grow howMuch (start, end) = let
+        dSize = (howMuch, howMuch)
+        clampToLevel = flip clampCoordinatesToLevel $ level
+        in (clampToLevel $ start |-| dSize, clampToLevel $ end |+| dSize)
+
+

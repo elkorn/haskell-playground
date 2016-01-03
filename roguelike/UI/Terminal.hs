@@ -70,6 +70,9 @@ sgrData = M.fromList
 
 getSgr = flip M.lookup $ sgrData
 
+blah =
+  setCursorPosition 41 0
+
 prepareGame :: WorldState -> IO ()
 prepareGame world = do
     hSetEcho stdin False
@@ -77,7 +80,7 @@ prepareGame world = do
     hSetBuffering stdout NoBuffering
     hideCursor
     setTitle "Game!"
-    clearScreen
+    -- clearScreen
     drawWorld world
 
 drawHero :: WorldState -> IO ()
