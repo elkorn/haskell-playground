@@ -3,17 +3,6 @@ module Level where
 import qualified Data.Map as M
 import Types
 
-emptyLevel :: Level
-emptyLevel = Level
-    { levelDepth = 0
-    , levelGold = M.empty
-    , levelItems = M.empty
-    , levelMapped = M.empty
-    , levelMax = (1,1)
-    , levelTiles = M.empty
-    , levelMonsters = M.empty
-    }
-
 populate :: Level -> (Coordinates, Char) -> Level
 populate level (coordinates, tile) =
     case tile of
@@ -50,26 +39,26 @@ map1   = [ "##############"
 level1 :: Level
 level1 = parseMap map1
 
-levelLookup ::
-  (Level -> M.Map Coordinates a) ->
-  a ->
+type LevelPositionLookup =
   Coordinates ->
   Level ->
   Bool
+
+levelLookup :: (Eq a) =>
+  (Level -> M.Map Coordinates a) ->
+  a -> LevelPositionLookup
 levelLookup accessor searchFor coordinates level =
   case M.lookup coordinates $ accessor level of
-    Just searchFor -> True
+    Just found -> searchFor == found
     _ -> False
 
 existLevelLookup :: 
   (Level -> M.Map Coordinates a) ->
-  Coordinates ->
-  Level ->
-  Bool
+  LevelPositionLookup
 existLevelLookup accessor coordinates level =
   M.member coordinates $ accessor level
 
-isTileType :: Tile -> Coordinates -> Level -> Bool
+isTileType :: Tile -> LevelPositionLookup
 isTileType = levelLookup levelTiles
 
 -- PROBLEM: nested data types, would have to use wildcards in expression context
@@ -90,23 +79,22 @@ isTileType = levelLookup levelTiles
 
 isAcid = isTileType Acid
 isWall = isTileType Wall
-isDoorOpen = isTileType (Dr Open)
-isDoorClosed = isTileType (Dr Closed)
+isOpenDoor = isTileType (Dr Open)
+isClosedDoor = isTileType (Dr Closed)
 isDownstairs = isTileType (St Downstairs)
 isUpstairs = isTileType (St Upstairs)
 
-isArmor :: Coordinates -> Level -> Bool
+isArmor :: LevelPositionLookup
 isArmor coordinates level = case M.lookup coordinates $ levelItems level of
   Just (Arm _) -> True
   _ -> False
 
-isWeapon :: Coordinates -> Level -> Bool
+isWeapon :: LevelPositionLookup
 isWeapon coordinates level = case M.lookup coordinates $ levelItems level of
   Just (Weap _) -> True
   _ -> False
 
-
-isPotion :: Coordinates -> Level -> Bool
+isPotion :: LevelPositionLookup
 isPotion coordinates level = case M.lookup coordinates $ levelItems level of
   Just (Pot _) -> True
   _ -> False
