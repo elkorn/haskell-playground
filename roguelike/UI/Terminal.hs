@@ -62,7 +62,9 @@ sgrData = M.fromList
         , ( '~'
           , [ SetConsoleIntensity NormalIntensity
          , SetColor Foreground Vivid Green])
-        , ( ' '
+        , ( '.'
+          , [ Reset ])
+        , ( '?'
           , [ Reset ])
         ]
 
@@ -132,4 +134,5 @@ coordinatesToCharacter coordinates (World hero _ level _)
   | isMonster     coordinates level  = 'v'
   | isWall        coordinates level  = '#'
   | isWeapon      coordinates level  = ')'
-  | otherwise                        = ' '
+  | isFloor       coordinates level  = ' '
+  | otherwise                        = '?'

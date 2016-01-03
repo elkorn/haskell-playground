@@ -16,6 +16,16 @@ data Input
     | Exit
     deriving (Show,Eq)
 
+data LevelSize
+    = Small
+    | Medium
+    | Large
+    | Huge
+      deriving Show
+
+-- This will be used to add gold, monsters etc.
+data LevelSpec = LevelSpec LevelSize
+
 data WorldState = World
     { worldHero :: Hero
     , worldDepth :: Int
@@ -84,6 +94,7 @@ data Tile
     | Dr Door
     | St Stairs
     | Wall
+    | Floor
       deriving (Eq, Show)
 
 data Door

@@ -12,6 +12,7 @@ populate level (coordinates, tile) =
         '+'   -> level { levelTiles = M.insert coordinates (Dr Closed)     t }
         '-'   -> level { levelTiles = M.insert coordinates (Dr Open)       t }
         '~'   -> level { levelTiles = M.insert coordinates Acid            t }
+        ' '   -> level { levelTiles = M.insert coordinates Floor           t }
         _     -> level
         where t = levelTiles level
 
@@ -26,14 +27,22 @@ parseMap str = let
   maxCoordinates = (maxX, maxY)
   in foldl populate (emptyLevel {levelMax = maxCoordinates}) asciiMap
 
+updateLevelMax :: Level -> Level
+updateLevelMax level@(Level _ _ _ _ _ tiles _) = let
+  maxX = maximum . map (fst . fst) $ M.toList tiles 
+  maxY = maximum . map (snd . fst) $ M.toList tiles
+  maxCoordinates = (maxX, maxY)
+  in level {levelMax = maxCoordinates }
+  
+
 map1 :: [String]
 map1   = [ "##############"
-         , "#>           #          ######"
-         , "#            ############    #"
-         , "#            -          +    #"
-         , "#    ~~      ############    #"
-         , "#     ~~     #          #    #"
-         , "#      ~~    #          # <  #"
+         , "#>...........#          ######"
+         , "#............############....#"
+         , "#............-..........+....#"
+         , "#....~~......############....#"
+         , "#.....~~.....#          #....#"
+         , "#......~~....#          #.<..#"
          , "##############          ######" ]
 
 level1 :: Level
@@ -83,6 +92,7 @@ isOpenDoor = isTileType (Dr Open)
 isClosedDoor = isTileType (Dr Closed)
 isDownstairs = isTileType (St Downstairs)
 isUpstairs = isTileType (St Upstairs)
+isFloor = isTileType Floor
 
 isArmor :: LevelPositionLookup
 isArmor coordinates level = case M.lookup coordinates $ levelItems level of

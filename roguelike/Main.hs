@@ -4,14 +4,16 @@ import Prelude hiding (Either(..))
 
 import Types
 import Level
+import LevelGen
 
 import UI.Terminal
 
 main :: IO ()
 main = do
+    customLevel <- generateLevel $ LevelSpec Small
     let world = startingState
-            { worldLevel = level1
-            , worldLevels = [level1]
+            { worldLevel = customLevel
+            , worldLevels = [customLevel]
             , worldHero = startingHero
               {
                 heroPosition = (1,1)
