@@ -12,10 +12,10 @@ data Input
     deriving (Show,Eq)
 
 data WorldState = World
-    { wHero :: Hero
-    , wDepth :: Int
-    , wLevel :: Int
-    , wLevels :: [Int]
+    { worldHero :: Hero
+    , worldDepth :: Int
+    , worldLevel :: Int
+    , worldLevels :: [Int]
     }
 
 data Hero = Hero
@@ -24,7 +24,7 @@ data Hero = Hero
     , heroHP :: Int
     , heroItems :: [Item]
     , heroOldPosition :: Coordinates
-    , heroWield :: Weapon
+    , heroWields :: Weapon
     , heroWears :: Armor
     }
 
@@ -85,3 +85,16 @@ data Door
 data Stairs
     = Downstairs
     | Upstairs
+
+startingHero :: Hero
+startingHero = Hero
+        (1, 1)
+        0
+        10
+        []
+        (1, 1)
+        (Weapon 0 "Fists" 0)
+        (Armor 0 "Rags")
+
+startingState :: WorldState
+startingState = World startingHero 0 0 []

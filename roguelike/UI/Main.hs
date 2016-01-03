@@ -7,11 +7,7 @@ import UI.Types
 import UI.Dummy
 import UI.Terminal
 
-data UIMode = Console
-            | Dummy deriving Show
-
--- problem :(
--- selectUi :: (UI u) => UIMode -> u
--- selectUi mode = case mode of
---   Console -> TerminalUI
---   Dummy -> DummyUI
+selectUi :: String -> Maybe UIMode
+selectUi str = case readMaybe str of
+  Just mode -> Just mode
+  Nothing -> Nothing

@@ -1,8 +1,7 @@
+{-# LANGUAGE DataKinds #-}
 module UI.Dummy where
 
 import UI.Types
-
-data DummyUI = DummyUI
 
 instance UI DummyUI where
   prepareGame _ = do

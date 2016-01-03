@@ -1,11 +1,10 @@
 module Roguelike where
 
 import Prelude hiding (Either(..))
-import System.Console.ANSI
-
-import System.IO
 
 import Types
+
+import UI.Terminal
 
 getInput :: IO Input
 getInput = do
@@ -18,17 +17,9 @@ getInput = do
     'd' -> return Right
     _ -> getInput
 
-drawHero :: Coordinates -> IO ()
-drawHero (x, y) = do
-  clearScreen
-  setCursorPosition y x
-  setSGR [ SetConsoleIntensity BoldIntensity
-         , SetColor Foreground Vivid Blue ]
-  putStr "@"
-
 gameLoop :: WorldState -> IO ()
 gameLoop world@(World hero _ _ _) = do
-  drawHero $ heroPosition hero
+  drawCharacter $ heroPosition hero
   input <- getInput
   case input of
     Exit ->  handleExit
@@ -56,28 +47,15 @@ clampCoordinatesToScreen (oldX,oldY) = let _min = 1
     in (newX, newY)
 
 handleDir :: WorldState -> Input -> WorldState
-handleDir (World (Hero position gold hp items oldPosition wield wears) depth level levels) input = World
-        (Hero (clampCoordinatesToScreen $ position |+| dCoordinates) gold hp items position wield wears)
-        depth
-        level
-        levels
+handleDir world@(World hero@(Hero position _ _ _ oldPosition _ _) _ _ _) input = world
+    { worldHero = hero
+      { heroPosition = (clampCoordinatesToScreen $ position |+| dCoordinates)
+      , heroOldPosition = oldPosition
+      }
+    }
     where dCoordinates = inputToCoordinates input
-handleExit :: IO ()
-handleExit = do
-  setSGR [ Reset ]
-  clearScreen
-  setCursorPosition 0 0
-  showCursor
-  putStrLn "Goodbye!"
-
-hero :: Hero
-hero = Hero (1,1) 0 10 [] (1,1) (Weapon 0 "" 0) (Armor 0 "")
 
 main :: IO ()
 main = do
-  hSetEcho stdin False
-  hSetBuffering stdin NoBuffering
-  hSetBuffering stdout NoBuffering
-  hideCursor
-  setTitle "Game!"
-  gameLoop $ World hero 0 0 []
+  prepareGame
+  gameLoop $ startingState
