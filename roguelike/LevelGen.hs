@@ -54,10 +54,7 @@ generateLevel spec = do
     let baseLevel = emptyLevel
             { levelMax = (80, 40)
             }
-    rooms <- generateRooms baseLevel [] 2
-    adjacency <- generateRoomAdjacency rooms baseLevel
-    print $ map (\(room, adj) -> (fst . roomCoordinates $ room, map (fst . roomCoordinates) rooms)) $ M.toList $ M.filter (\x -> length x > 0) adjacency
-    putStrLn " "
+    rooms <- generateRooms baseLevel [] 10
     return $
         updateLevelMax $
         baseLevel
@@ -78,25 +75,17 @@ roomToTiles (Room ((startX, startY), (endX, endY)) _) =
         then Wall
         else Floor
 
-generateRoomAdjacency :: [Room] -> Level -> IO (M.Map Room [Room])
-generateRoomAdjacency rooms level = do
-  print $ roomCoordinates (rooms !! 0)
-  print $ grow 1 $ roomCoordinates (rooms !! 0)
-  print $ roomCoordinates (rooms !! 1)
-  print $ grow 1 $ roomCoordinates (rooms !! 1)
-  print $ intersects (grow 1 $ roomCoordinates (rooms !! 0)) (grow 1 $ roomCoordinates (rooms !! 1))
-  print $ intersects (grow 1 $ roomCoordinates (rooms !! 1)) (grow 1 $ roomCoordinates (rooms !! 0))
-  print $ isAdjacent (rooms !! 0) (rooms !! 1)
-  print $ getAdjacents (rooms !! 0)
-  print $ getAdjacents (rooms !! 1)
-  return $ M.fromList $ zip rooms $ map getAdjacents rooms 
+generateRoomAdjacency :: [Room] -> Level -> M.Map Room [Room]
+generateRoomAdjacency rooms level =
+  M.fromList $ zip rooms $ map getAdjacents rooms
   where
-    getAdjacents :: Room -> [Room] 
+    getAdjacents :: Room -> [Room]
     getAdjacents room = filter (isAdjacent room) rooms
     isAdjacent :: Room -> Room -> Bool
     isAdjacent roomA roomB =
+      roomA /= roomB &&
       intersects intersectionRangeA intersectionRangeB
-      where 
+      where
         intersectionRangeA = grow 1 $ roomCoordinates roomA
         intersectionRangeB = grow 1 $ roomCoordinates roomB
     grow :: Int -> RectBoundaries -> RectBoundaries
