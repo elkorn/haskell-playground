@@ -1,4 +1,4 @@
-module LevelGen where
+module LevelGen (generateLevel) where
 
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -24,6 +24,56 @@ roomLocation = fst . roomCoordinates
 
 minWidth = 4
 minHeight = 4
+
+generateLevel :: LevelSpec -> IO Level
+generateLevel spec = do
+    let baseLevel = emptyLevel
+            { levelMax = (80, 40)
+            }
+    rooms <- generateRooms baseLevel [] 10 
+    return $
+        updateLevelMax $
+        baseLevel
+        { levelTiles = foldl M.union M.empty $
+          map roomToTiles rooms
+        }
+
+roomToTiles :: Room -> M.Map Coordinates Tile
+roomToTiles (Room bounds@((startX, startY), (endX, endY)) meldedRooms) =
+  M.fromList tiles
+  where
+    tiles = zip coordinates $ map roomCoordinatesToTile coordinates
+    coordinates = [(x,y) | x <- [startX .. endX], y <- [startY .. endY]]
+    roomCoordinatesToTile :: Coordinates -> Tile
+    roomCoordinatesToTile coordinates@(x, y)
+      | shouldBeMelded coordinates = Floor
+      | isBoundary x startX endX || isBoundary y startY endY = Wall
+      | otherwise = Floor
+    shouldBeMelded :: Coordinates -> Bool
+    shouldBeMelded coordinates = any (flip isInsideBounds coordinates) meldBounds
+    meldBounds = map roomCoordinates $ S.toList meldedRooms
+    isBoundary :: Int -> Int -> Int -> Bool
+    isBoundary coord startBound endBound = coord == startBound || coord == endBound
+    
+generateRooms :: Level -> [Room] -> Int -> IO [Room]
+generateRooms level existingRooms 0 = return existingRooms
+generateRooms level existingRooms n = do
+  let (maxX, maxY) = levelMax level
+  room <- generateRoom level (maxX `div` 3, maxY `div` 3)
+  (nextRooms, roomsLeft) <- setUpNextRooms room existingRooms n
+  generateRooms level nextRooms roomsLeft
+  where
+    setUpNextRooms :: Room -> [Room] -> Int -> IO ([Room], Int)
+    setUpNextRooms room existingRooms roomsLeft = do
+        let intersectingRooms = filter (roomIntersects room) existingRooms
+        let newRoomIntersectsExistingOnes = length intersectingRooms > 0
+        if newRoomIntersectsExistingOnes
+        then do
+             shouldMeld <- coinFlip
+             if shouldMeld
+                then return (meldRooms room existingRooms intersectingRooms, n-1)
+                else return (existingRooms, n)
+        else return (room:existingRooms, n-1) 
 
 generateRoom :: Level -> RoomSize -> IO Room
 generateRoom level (maxWidth, maxHeight) = do
@@ -73,56 +123,6 @@ meldRooms roomToMeldIn roomsToMeldInto intersectingRooms =
     meldRoomIfIntersects roomToBeMelded intersectingRooms roomToMeldInto 
       | roomToMeldInto `elem` intersectingRooms = meldRoomWithAnother roomToMeldInto roomToBeMelded
       | otherwise = roomToMeldInto
-    
-generateRooms :: Level -> [Room] -> Int -> IO [Room]
-generateRooms level existingRooms 0 = return existingRooms
-generateRooms level existingRooms n = do
-  let (maxX, maxY) = levelMax level
-  room <- generateRoom level (maxX `div` 3, maxY `div` 3)
-  (nextRooms, roomsLeft) <- setUpNextRooms room existingRooms n
-  generateRooms level nextRooms roomsLeft
-  where
-    setUpNextRooms :: Room -> [Room] -> Int -> IO ([Room], Int)
-    setUpNextRooms room existingRooms roomsLeft = do
-        let intersectingRooms = filter (roomIntersects room) existingRooms
-        let newRoomIntersectsExistingOnes = length intersectingRooms > 0
-        if newRoomIntersectsExistingOnes
-        then do
-             shouldMeld <- coinFlip
-             if shouldMeld
-                then return (meldRooms room existingRooms intersectingRooms, n-1)
-                else return (existingRooms, n)
-        else return (room:existingRooms, n-1) 
-
-generateLevel :: LevelSpec -> IO Level
-generateLevel spec = do
-    let baseLevel = emptyLevel
-            { levelMax = (80, 40)
-            }
-    rooms <- generateRooms baseLevel [] 10 
-    return $
-        updateLevelMax $
-        baseLevel
-        { levelTiles = foldl M.union M.empty $
-          map roomToTiles rooms
-        }
-
-roomToTiles :: Room -> M.Map Coordinates Tile
-roomToTiles (Room bounds@((startX, startY), (endX, endY)) meldedRooms) =
-  M.fromList tiles
-  where
-    tiles = zip coordinates $ map roomCoordinatesToTile coordinates
-    coordinates = [(x,y) | x <- [startX .. endX], y <- [startY .. endY]]
-    roomCoordinatesToTile :: Coordinates -> Tile
-    roomCoordinatesToTile coordinates@(x, y)
-      | shouldBeMelded coordinates = Floor
-      | isBoundary x startX endX || isBoundary y startY endY = Wall
-      | otherwise = Floor
-    shouldBeMelded :: Coordinates -> Bool
-    shouldBeMelded coordinates = any (flip isInsideBounds coordinates) meldBounds
-    meldBounds = map roomCoordinates $ S.toList meldedRooms
-    isBoundary :: Int -> Int -> Int -> Bool
-    isBoundary coord startBound endBound = coord == startBound || coord == endBound
 
 generateRoomAdjacency :: [Room] -> Level -> M.Map Room [Room]
 generateRoomAdjacency rooms level =
@@ -142,5 +142,3 @@ generateRoomAdjacency rooms level =
         dSize = (howMuch, howMuch)
         clampToLevel = flip clampCoordinatesToLevel $ level
         in (clampToLevel $ start |-| dSize, clampToLevel $ end |+| dSize)
-
-
