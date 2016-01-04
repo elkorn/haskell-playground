@@ -1,10 +1,12 @@
 module LevelGen (generateLevel) where
 
+import Control.Applicative
+
 import qualified Data.Set as S
 import qualified Data.Map as M
 
 import Level
-import System.Random (randomRIO)
+import System.Random (randomRIO, getStdGen, randomRs)
 import Types
 import Utils
 
@@ -13,11 +15,14 @@ type RectBoundaries = (Coordinates, Coordinates)
 type RoomSize = (Int, Int)
 type Size = (Int, Int)
 
-data Room = Room
-    { roomCoordinates :: RectBoundaries
-    -- , roomConnections :: S.Set Room
-    , roomMeldedWith :: S.Set Room
-    } deriving (Ord, Eq, Show)
+data Room
+    = Room { roomCoordinates :: RectBoundaries
+           , roomMeldedWith :: S.Set Room
+           , roomConnections :: S.Set Room
+           }
+    | Corridor { corridorCoordinates :: [RectBoundaries]
+               }
+    deriving (Ord,Eq,Show)
 
 roomLocation :: Room -> Coordinates
 roomLocation = fst . roomCoordinates
@@ -39,7 +44,7 @@ generateLevel spec = do
         }
 
 roomToTiles :: Room -> M.Map Coordinates Tile
-roomToTiles (Room bounds@((startX, startY), (endX, endY)) meldedRooms) =
+roomToTiles (Room bounds@((startX, startY), (endX, endY)) meldedRooms _) =
   M.fromList tiles
   where
     tiles = zip coordinates $ map roomCoordinatesToTile coordinates
@@ -82,7 +87,7 @@ generateRoom level (maxWidth, maxHeight) = do
   height <- randomRIO (minHeight, maxHeight)
   startX <- randomRIO (0, maxX - width)
   startY <- randomRIO (0, maxY - height)
-  return $ Room ((startX, startY), (startX + width, startY + height)) S.empty
+  return $ Room ((startX, startY), (startX + width, startY + height)) S.empty S.empty
 
 intersects :: RectBoundaries -> RectBoundaries -> Bool
 intersects ((x1a,y1a),(x2a,y2a)) ((x1b,y1b),(x2b,y2b)) =
@@ -92,7 +97,7 @@ intersects ((x1a,y1a),(x2a,y2a)) ((x1b,y1b),(x2b,y2b)) =
   y2a >= y1b
 
 roomIntersects :: Room -> Room -> Bool
-roomIntersects (Room boundsA _) (Room boundsB _) =
+roomIntersects (Room boundsA _ _) (Room boundsB _ _) =
   intersects boundsA boundsB
 
 intersection :: RectBoundaries -> RectBoundaries -> RectBoundaries
@@ -123,6 +128,24 @@ meldRooms roomToMeldIn roomsToMeldInto intersectingRooms =
     meldRoomIfIntersects roomToBeMelded intersectingRooms roomToMeldInto 
       | roomToMeldInto `elem` intersectingRooms = meldRoomWithAnother roomToMeldInto roomToBeMelded
       | otherwise = roomToMeldInto
+
+generateCorridors :: [Room] -> IO [Room]
+generateCorridors rooms = do
+  connections <- generateConnections rooms
+  return []
+  where
+    generateConnections :: [Room] -> IO [(Room, Room)]
+    generateConnections rooms = do
+      let n = length rooms
+      numberOfConnections <- randomRIO (n, 2*n)
+      let allConnections = (,) <$> rooms <*> rooms
+      selectRandom numberOfConnections allConnections
+      where
+        selectRandom :: Int -> [a] -> IO [a]
+        selectRandom howMany items = do
+          stdGen <- getStdGen
+          let indices = randomRs (0, (length items) - 1) stdGen
+          return $ map (items !!) [1..howMany]
 
 generateRoomAdjacency :: [Room] -> Level -> M.Map Room [Room]
 generateRoomAdjacency rooms level =
