@@ -1,5 +1,7 @@
 module Utils where
 
+import System.Random (randomRIO)
+
 import Types
 
 (|+|) :: Coordinates -> Coordinates -> Coordinates
@@ -19,3 +21,8 @@ clampCoordinates (srcX, srcY) (minX, minY) (maxX, maxY) =
 clampCoordinatesToLevel :: Coordinates -> Level -> Coordinates
 clampCoordinatesToLevel coordinates (Level _ _ _ _ levelMax _ _)=
   clampCoordinates coordinates (0,0) levelMax
+
+coinFlip :: IO Bool
+coinFlip = do
+  result <- (randomRIO (0, 1)) :: IO Int
+  return $ result == 0
