@@ -2,8 +2,11 @@ module LevelGen (generateLevel) where
 
 import Control.Applicative
 
-import qualified Data.Set as S
+import qualified Data.List as L
 import qualified Data.Map as M
+import qualified Data.Set as S
+
+import Data.Maybe (fromJust)
 
 import Level
 import System.Random (randomRIO, getStdGen, randomRs)
@@ -14,6 +17,13 @@ type RoomLocationInGrid = (Int, Int)
 type RectBoundaries = (Coordinates, Coordinates)
 type RoomSize = (Int, Int)
 type Size = (Int, Int)
+
+data Wall
+    = North
+    | South
+    | East
+    | West
+    deriving (Eq,Show)
 
 data Room
     = Room { roomCoordinates :: RectBoundaries
@@ -35,7 +45,9 @@ generateLevel spec = do
     let baseLevel = emptyLevel
             { levelMax = (80, 40)
             }
-    rooms <- generateRooms baseLevel [] 10 
+    rooms <- generateRooms baseLevel [] 2
+    corridors <- generateCorridors rooms
+    print corridors
     return $
         updateLevelMax $
         baseLevel
@@ -59,7 +71,7 @@ roomToTiles (Room bounds@((startX, startY), (endX, endY)) meldedRooms _) =
     meldBounds = map roomCoordinates $ S.toList meldedRooms
     isBoundary :: Int -> Int -> Int -> Bool
     isBoundary coord startBound endBound = coord == startBound || coord == endBound
-    
+
 generateRooms :: Level -> [Room] -> Int -> IO [Room]
 generateRooms level existingRooms 0 = return existingRooms
 generateRooms level existingRooms n = do
@@ -132,7 +144,7 @@ meldRooms roomToMeldIn roomsToMeldInto intersectingRooms =
 generateCorridors :: [Room] -> IO [Room]
 generateCorridors rooms = do
   connections <- generateConnections rooms
-  return []
+  return $ createCorridorsForConnections connections
   where
     generateConnections :: [Room] -> IO [(Room, Room)]
     generateConnections rooms = do
@@ -140,12 +152,31 @@ generateCorridors rooms = do
       numberOfConnections <- randomRIO (n, 2*n)
       let allConnections = (,) <$> rooms <*> rooms
       selectRandom numberOfConnections allConnections
-      where
-        selectRandom :: Int -> [a] -> IO [a]
-        selectRandom howMany items = do
-          stdGen <- getStdGen
-          let indices = randomRs (0, (length items) - 1) stdGen
-          return $ map (items !!) [1..howMany]
+    selectRandom :: Int -> [a] -> IO [a]
+    selectRandom howMany items = do
+        stdGen <- getStdGen
+        let indices = randomRs (0, (length items) - 1) stdGen
+        print (take howMany indices)
+        return $ map (items !!) (take howMany indices)
+    createCorridorsForConnections :: [(Room, Room)] -> [Room]
+    createCorridorsForConnections connections = foldl (\result connection -> (createCorridor connection):result) [] connections
+    createCorridor :: (Room, Room) -> Room
+    createCorridor (Room ((x1a, y1a), (x2a, y2a)) _ _, Room ((x1b, y1b), (x2b, y2b)) _ _) = let
+      (startX, endX) = getInner (x1a, x2a) (x1b, x2b)
+      (startY, endY) = getInner (y1a, y2a) (y1b, y2b)
+      in Corridor [((startX, startY), (endX, startY + 2)),((startX, startY), (startX + 2, endY))]
+    getInner :: (Int, Int) -> (Int, Int) -> (Int, Int) -- These are not correct coordinates, the format is (x,x) or (y,y).
+    getInner leftValues rightValues = let
+      allValues = leftValues `cross` rightValues
+      differences = map (\(a,b) -> a - b) allValues
+      minDifference = minimum differences
+      minIndex = fromJust $ L.elemIndex minDifference differences
+      min@(minA, minB) = allValues !! minIndex
+      in if minA < minB then min
+                        else (minB, minA)
+
+cross :: (a, a) -> (a, a) -> [(a,a)]
+(a1, a2) `cross` (a3, a4) = zip [a1,a2] [a3,a4]
 
 generateRoomAdjacency :: [Room] -> Level -> M.Map Room [Room]
 generateRoomAdjacency rooms level =
