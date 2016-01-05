@@ -49,7 +49,7 @@ generateLevel spec = do
     rooms <- generateRooms baseLevel [] 2
     corridors <- generateCorridors rooms
     return $
-        updateLevelMax $
+        -- updateLevelMax $
         baseLevel
         { levelTiles = foldl M.union M.empty $
           map roomToTiles (rooms ++ corridors) 
@@ -182,22 +182,24 @@ generateCorridors rooms = do
     createCorridor (Room ((x1a, y1a), (x2a, y2a)) _ _, Room ((x1b, y1b), (x2b, y2b)) _ _) = let
       (startX, endX) = getInner (x1a, x2a) (x1b, x2b)
       (startY, endY) = getInner (y1a, y2a) (y1b, y2b)
-      in Corridor [((startX, startY), (endX, startY + 2)),((startX, startY), (startX + 2, endY))] S.empty
-    getInner :: (Int, Int) -> (Int, Int) -> (Int, Int) -- These are not correct coordinates, the format is (x,x) or (y,y).
-    getInner leftValues rightValues = let
-      allValues = leftValues `cross` rightValues
-      differences = map (\(a,b) -> a - b) allValues
-      minDifference = minimum differences
-      minIndex = fromJust $ L.elemIndex minDifference differences
-      min@(minA, minB) = allValues !! minIndex
-      in if minA < minB then min
-                        else (minB, minA)
+      in Corridor [((startX - 1, startY - 1), (endX + 1, startY + 2)),((startX - 1, startY - 1), (startX + 2, endY + 1))] S.empty
     updateCrossedRooms :: Room -> Room
     updateCrossedRooms corridor@(Corridor legs crossedRooms) =
       corridor {corridorGoesThroughRooms = S.union crossedRooms (S.fromList $ filter (roomIntersects corridor) rooms)}
 
+getInner :: (Int, Int) -> (Int, Int) -> (Int, Int) -- These are not correct coordinates, the format is (x,x) or (y,y).
+getInner leftValues rightValues = let
+    allValues = leftValues `cross` rightValues
+    differences = map (\(a,b) -> a - b) allValues
+    absDifferences = map abs differences
+    minAbsDifference = minimum absDifferences
+    minDifference = minimum differences
+    minIndex = fromJust $ L.elemIndex minAbsDifference absDifferences
+    min@(minA, minB) = allValues !! minIndex
+    in if minA < minB then min
+                    else (minB, minA)
 cross :: (a, a) -> (a, a) -> [(a,a)]
-(a1, a2) `cross` (a3, a4) = zip [a1,a2] [a3,a4]
+(a1, a2) `cross` (a3, a4) = (,) <$> [a1,a2] <*> [a3,a4]
 
 generateRoomAdjacency :: [Room] -> Level -> M.Map Room [Room]
 generateRoomAdjacency rooms level =
