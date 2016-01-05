@@ -41,6 +41,8 @@ roomLocation = fst . roomCoordinates
 minWidth = 4
 minHeight = 4
 
+corridorWidth = 2
+
 generateLevel :: LevelSpec -> IO Level
 generateLevel spec = do
     let baseLevel = emptyLevel
@@ -48,6 +50,7 @@ generateLevel spec = do
             }
     rooms <- generateRooms baseLevel [] 2
     corridors <- generateCorridors rooms
+    print $ map corridorCoordinates corridors
     return $
         -- updateLevelMax $
         baseLevel
@@ -168,7 +171,7 @@ generateCorridors rooms = do
     generateConnections :: [Room] -> IO [(Room, Room)]
     generateConnections rooms = do
       let n = length rooms
-      numberOfConnections <- randomRIO (n, 2*n)
+      numberOfConnections <- randomRIO (n, n)
       let allConnections = (,) <$> rooms <*> rooms
       selectRandom numberOfConnections allConnections
     selectRandom :: Int -> [a] -> IO [a]
@@ -180,9 +183,12 @@ generateCorridors rooms = do
     createCorridorsForConnections connections = foldl (\result connection -> (createCorridor connection):result) [] connections
     createCorridor :: (Room, Room) -> Room
     createCorridor (Room ((x1a, y1a), (x2a, y2a)) _ _, Room ((x1b, y1b), (x2b, y2b)) _ _) = let
+      -- The horizontal and vertical legs have to be created differently. 
       (startX, endX) = getInner (x1a, x2a) (x1b, x2b)
       (startY, endY) = getInner (y1a, y2a) (y1b, y2b)
-      in Corridor [((startX - 1, startY - 1), (endX + 1, startY + 2)),((startX - 1, startY - 1), (startX + 2, endY + 1))] S.empty
+      -- To make the corridor enter the start and finish room, discern between
+      -- horizontal and vertical legs and grow only the main dimension.
+      in Corridor [((startX, startY), (endX, startY + corridorWidth)),((startX, startY), (startX + corridorWidth, endY))] S.empty
     updateCrossedRooms :: Room -> Room
     updateCrossedRooms corridor@(Corridor legs crossedRooms) =
       corridor {corridorGoesThroughRooms = S.union crossedRooms (S.fromList $ filter (roomIntersects corridor) rooms)}
