@@ -81,7 +81,7 @@ prepareGame world = do
     hideCursor
     setTitle "Game!"
     -- clearScreen
-    drawWorld world
+    -- drawWorld world
 
 drawHero :: WorldState -> IO ()
 drawHero world

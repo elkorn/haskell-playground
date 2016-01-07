@@ -1,6 +1,7 @@
 module LevelGen (generateLevel) where
 
 import Control.Applicative
+import Debug.Trace
 
 import qualified Data.List as L
 import qualified Data.Map as M
@@ -17,13 +18,6 @@ type RoomLocationInGrid = (Int, Int)
 type RectBoundaries = (Coordinates, Coordinates)
 type RoomSize = (Int, Int)
 type Size = (Int, Int)
-
-data Wall
-    = North
-    | South
-    | East
-    | West
-    deriving (Eq,Show)
 
 data Room
     = Room { roomCoordinates :: RectBoundaries
@@ -49,6 +43,8 @@ generateLevel spec = do
             { levelMax = (80, 40)
             }
     rooms <- generateRooms baseLevel [] 2
+    print $ map roomCoordinates rooms
+    print $ map (getCenter . roomCoordinates) rooms
     corridors <- generateCorridors rooms
     print $ map corridorCoordinates corridors
     return $
@@ -63,7 +59,7 @@ roomToTiles (Room bounds@((startX, startY), (endX, endY)) meldedRooms _) =
   M.fromList tiles
   where
     tiles = zip coordinates $ map roomCoordinatesToTile coordinates
-    coordinates = [(x,y) | x <- [startX .. endX], y <- [startY .. endY]]
+    coordinates = rectCoordinates bounds
     roomCoordinatesToTile :: Coordinates -> Tile
     roomCoordinatesToTile coordinates@(x, y)
       | shouldBeMelded coordinates = Floor
@@ -120,11 +116,11 @@ generateRoom level (maxWidth, maxHeight) = do
   return $ Room ((startX, startY), (startX + width, startY + height)) S.empty S.empty
 
 intersects :: RectBoundaries -> RectBoundaries -> Bool
-intersects ((x1a,y1a),(x2a,y2a)) ((x1b,y1b),(x2b,y2b)) =
-  x1a <= x2b &&
-  x2a >= x1b &&
-  y1a <= y2b &&
-  y2a >= y1b
+intersects a@((x1a,y1a),(x2a,y2a)) b@((x1b,y1b),(x2b,y2b)) =
+   x1a <= x2b &&
+   x2a >= x1b &&
+   y1a <= y2b &&
+   y2a >= y1b
 
 roomIntersects :: Room -> Room -> Bool
 roomIntersects (Room boundsA _ _) (Room boundsB _ _) =
@@ -134,12 +130,18 @@ roomIntersects (Corridor legs _) (Room roomBounds _ _) =
 roomIntersects room@(Room _ _ _) corridor@(Corridor _ _) =
   roomIntersects corridor room
 
-intersection :: RectBoundaries -> RectBoundaries -> RectBoundaries
-intersection ((x1a,y1a),(x2a,y2a)) roomB =
-  (minimum intersectingTiles, maximum intersectingTiles)
+rectCoordinates :: RectBoundaries -> [Coordinates]
+rectCoordinates ((x1a,y1a),(x2a,y2a)) =  [(x,y) | x <- [minX..maxX] , y <- [minY..maxY]]
   where
-    roomATiles = [(x,y) | x <- [x1a..x2a] , y <- [y1a..y2a]]
-    intersectingTiles = filter (isInsideBounds roomB) roomATiles
+    [minX, maxX] = L.sort [x1a, x2a]
+    [minY, maxY] = L.sort [y1a, y2a]
+
+intersection :: RectBoundaries -> RectBoundaries -> RectBoundaries
+intersection roomA@((x1a,y1a),(x2a,y2a)) roomB =
+  (minimum intersectingCoordinates, maximum intersectingCoordinates)
+  where
+    roomACoordinates = rectCoordinates roomA
+    intersectingCoordinates = filter (isInsideBounds roomB) roomACoordinates
 
 isInsideBounds :: RectBoundaries -> Coordinates -> Bool
 isInsideBounds ((roomX1, roomY1), (roomX2, roomY2)) (x,y) =
@@ -148,7 +150,7 @@ isInsideBounds ((roomX1, roomY1), (roomX2, roomY2)) (x,y) =
 meldRoomWithAnother :: Room -> Room -> Room
 meldRoomWithAnother roomA roomB =
   roomA {roomMeldedWith = S.insert roomB (roomMeldedWith roomA) }
-  
+
 meldRooms :: Room -> [Room] -> [Room] -> [Room]
 meldRooms roomToMeldIn roomsToMeldInto intersectingRooms =
   (roomToMeldIn{roomMeldedWith = roomsMeldedIn}:roomsMeldedInto)
@@ -174,16 +176,17 @@ generateCorridors rooms = do
       numberOfConnections <- randomRIO (n, n)
       let allConnections = (,) <$> rooms <*> rooms
       selectRandom numberOfConnections allConnections
-    selectRandom :: Int -> [a] -> IO [a]
-    selectRandom howMany items = do
-        stdGen <- getStdGen
-        let indices = randomRs (0, (length items) - 1) stdGen
-        return $ map (items !!) (take howMany indices)
     createCorridorsForConnections :: [(Room, Room)] -> [Room]
     createCorridorsForConnections connections = foldl (\result connection -> (createCorridor connection):result) [] connections
     updateCrossedRooms :: Room -> Room
     updateCrossedRooms corridor@(Corridor legs crossedRooms) =
       corridor {corridorGoesThroughRooms = S.union crossedRooms (S.fromList $ filter (roomIntersects corridor) rooms)}
+
+selectRandom :: Int -> [a] -> IO [a]
+selectRandom howMany items = do
+    stdGen <- getStdGen
+    let indices = randomRs (0, (length items) - 1) stdGen
+    return $ map (items !!) (take howMany indices)
 
 createCorridor :: (Room, Room) -> Room
 createCorridor (Room roomACoords@((x1a, y1a), (x2a, y2a)) _ _, Room roomBCoords@((x1b, y1b), (x2b, y2b)) _ _) = let
@@ -196,7 +199,19 @@ createCorridor (Room roomACoords@((x1a, y1a), (x2a, y2a)) _ _, Room roomBCoords@
     (startX, startY) = getCenter roomACoords
     (endX, endY) = getCenter roomBCoords
     halfWidth = corridorWidth `div` 2
-    in Corridor [grow level1 1 ((startX, startY - 1), (endX, startY + 1)), grow level1 1 ((endX - 1, startY), (endX + 1, endY))] S.empty
+    in Corridor [((startX, startY - 1), (endX, startY + 1)), ((endX - 1, startY), (endX + 1, endY))] S.empty
+
+createCorridor' :: (Room, Room) -> IO Room
+createCorridor' (Room roomACoords@((x1a, y1a), (x2a, y2a)) _ _, Room roomBCoords@((x1b, y1b), (x2b, y2b)) _ _) = do
+    let (startX, startY) = getCenter roomACoords
+    let (endX, endY) = getCenter roomBCoords
+    let halfWidth = corridorWidth `div` 2
+    print (startX, startY, endX, endY)
+    return $ Corridor [((startX, startY - 1), (endX, startY + 1)), ((endX - 1, startY), (endX + 1, endY))] S.empty
+
+getCenter :: RectBoundaries -> Coordinates
+getCenter ((startX, startY), (endX, endY)) =
+  ((startX + endX) `div` 2, (startY + endY) `div` 2)
 
 getInner :: (Int, Int) -> (Int, Int) -> (Int, Int) -- These are not correct coordinates, the format is (x,x) or (y,y).
 getInner leftValues rightValues = let
@@ -223,10 +238,11 @@ generateRoomAdjacency rooms level =
       roomA /= roomB &&
       intersects intersectionRangeA intersectionRangeB
       where
-        intersectionRangeA = grow 1 $ roomCoordinates roomA
-        intersectionRangeB = grow 1 $ roomCoordinates roomB
-    grow :: Int -> RectBoundaries -> RectBoundaries
-    grow howMuch (start, end) = let
-        dSize = (howMuch, howMuch)
-        clampToLevel = flip clampCoordinatesToLevel $ level
-        in (clampToLevel $ start |-| dSize, clampToLevel $ end |+| dSize)
+        intersectionRangeA = grow level 1 $ roomCoordinates roomA
+        intersectionRangeB = grow level 1 $ roomCoordinates roomB
+
+grow :: Level -> Int -> RectBoundaries -> RectBoundaries
+grow level howMuch (start, end) = let
+    dSize = (howMuch, howMuch)
+    clampToLevel = flip clampCoordinatesToLevel $ level
+    in (clampToLevel $ start |-| dSize, clampToLevel $ end |+| dSize)
