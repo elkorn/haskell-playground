@@ -14,6 +14,7 @@ data Input
     = Dir Direction
     | Wait
     | Exit
+    | Restart
     deriving (Show,Eq)
 
 data LevelSize

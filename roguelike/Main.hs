@@ -9,10 +9,19 @@ import UI.Terminal
 import Utils
 
 main :: IO ()
-main = do
+main = startGame
+
+startGame :: IO ()
+startGame = do
     blah
+    world <- startingWorld
+    prepareGame world
+    gameLoop $ world
+
+startingWorld :: IO WorldState
+startingWorld = do
     customLevel <- generateLevel $ LevelSpec Small
-    let world = startingState
+    return $ startingState
             { worldLevel = customLevel
             , worldLevels = [customLevel]
             , worldHero = startingHero
@@ -21,8 +30,7 @@ main = do
               , heroOldPosition = (1,1)
               }
             }
-    prepareGame world
-    gameLoop $ world
+
 
 getInput :: IO Input
 getInput = do
@@ -30,6 +38,7 @@ getInput = do
   case char of
     ' ' -> return Wait
     'q' -> return Exit
+    'r' -> return Restart
     'w' -> return $ Dir Up
     's' -> return $ Dir Down
     'a' -> return $ Dir Left
@@ -43,6 +52,7 @@ gameLoop world@(World hero _ _ _) = do
   case input of
     Dir direction -> gameLoop $ handleDirection world direction
     Wait          -> gameLoop world
+    Restart       -> startGame
     Exit          -> handleExit
 
 directionToCoordinates :: Direction -> Coordinates

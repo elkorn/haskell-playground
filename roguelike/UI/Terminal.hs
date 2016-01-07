@@ -28,45 +28,27 @@ import Level
 --     showCursor
 --     putStrLn "Goodbye!"
 
+sgrFg :: ConsoleIntensity -> ColorIntensity -> Color -> [SGR]
+sgrFg fontIntensity colorIntensity color = [ SetConsoleIntensity fontIntensity
+                                           , SetColor
+                                                 Foreground
+                                                 colorIntensity
+                                                 color]
 sgrData :: M.Map Char [SGR]
 sgrData = M.fromList
-        [
-          ( '@'
-          , [ SetConsoleIntensity BoldIntensity
-            , SetColor Foreground Vivid Blue
-            ])
-        , ( '#'
-          , [ SetConsoleIntensity BoldIntensity
-         , SetColor Foreground Vivid Black ])
-        , ( '!'
-          , [ SetConsoleIntensity BoldIntensity
-         , SetColor Foreground Vivid Magenta])
-        , ( 'v'
-          , [ SetConsoleIntensity BoldIntensity
-         , SetColor Foreground Vivid Red])
-        , ( ')'
-          , [ SetConsoleIntensity BoldIntensity
-         , SetColor Foreground Vivid Cyan])
-        , ( '>'
-          , [ SetConsoleIntensity BoldIntensity
-         , SetColor Foreground Dull Blue])
-        , ( '<'
-          , [ SetConsoleIntensity BoldIntensity
-         , SetColor Foreground Dull Cyan])
-        , ( '+'
-          , [ SetConsoleIntensity NormalIntensity
-         , SetColor Foreground Dull Magenta])
-        , ( '-'
-          , [ SetConsoleIntensity NormalIntensity
-         , SetColor Foreground Dull Yellow])
-        , ( '~'
-          , [ SetConsoleIntensity NormalIntensity
-         , SetColor Foreground Vivid Green])
-        , ( '.'
-          , [ Reset ])
-        , ( '?'
-          , [ Reset ])
-        ]
+        [ ('@', sgrFg BoldIntensity Vivid Blue)
+        , ('#', sgrFg BoldIntensity Vivid Black)
+        , ('!', sgrFg BoldIntensity Vivid Magenta)
+        , ('v', sgrFg BoldIntensity Vivid Red)
+        , (')', sgrFg BoldIntensity Vivid Cyan)
+        , ('>', sgrFg BoldIntensity Dull Blue)
+        , ('<', sgrFg BoldIntensity Dull Cyan)
+        , ('+', sgrFg NormalIntensity Dull Magenta)
+        , ('-', sgrFg NormalIntensity Dull Yellow)
+        , ('~', sgrFg NormalIntensity Vivid Yellow)
+        , (' ', [Reset])
+        , ('.', [Reset])
+        , ('?', [Reset])]
 
 getSgr = flip M.lookup $ sgrData
 
@@ -81,7 +63,7 @@ prepareGame world = do
     hideCursor
     setTitle "Game!"
     -- clearScreen
-    -- drawWorld world
+    drawWorld world
 
 drawHero :: WorldState -> IO ()
 drawHero world
@@ -106,11 +88,9 @@ drawCharacter :: (Int, Int) -> WorldState -> IO ()
 drawCharacter (x,y) world = do
     let ch = coordinatesToCharacter (x,y) world
     let tile = M.lookup (x,y) $ (levelTiles . worldLevel) world
-    -- putStrLn $ show (x,y) ++ " " ++ show tile ++ " " ++ show ch
     setCursorPosition y x
     case getSgr ch of
       Nothing -> do
-        -- putChar 'X'
         return ()
       Just sgr -> do
         setSGR sgr
