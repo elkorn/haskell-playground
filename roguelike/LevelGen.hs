@@ -173,9 +173,11 @@ generateCorridors rooms = do
     generateConnections :: [Room] -> IO [(Room, Room)]
     generateConnections rooms = do
       let n = length rooms
-      numberOfConnections <- randomRIO (n, n)
+      numberOfConnections <- randomRIO (n `div` 2, 2*n)
       let allConnections = (,) <$> rooms <*> rooms
-      selectRandom numberOfConnections allConnections
+      let sensibleConnections = filter (\(a,b) -> a/=b ) allConnections
+      connections <- selectRandom numberOfConnections sensibleConnections
+      return $ L.nub connections
     createCorridorsForConnections :: [(Room, Room)] -> [Room]
     createCorridorsForConnections connections = foldl (\result connection -> (createCorridor connection):result) [] connections
     updateCrossedRooms :: Room -> Room
@@ -190,24 +192,10 @@ selectRandom howMany items = do
 
 createCorridor :: (Room, Room) -> Room
 createCorridor (Room roomACoords@((x1a, y1a), (x2a, y2a)) _ _, Room roomBCoords@((x1b, y1b), (x2b, y2b)) _ _) = let
-    -- The horizontal and vertical legs have to be created differently. 
-    -- (startX, endX) = getInner (x1a, x2a) (x1b, x2b)
-    -- (startY, endY) = getInner (y1a, y2a) (y1b, y2b)
-    -- To make the corridor enter the start and finish room, discern between
-    -- horizontal and vertical legs and grow only the main dimension.
-    -- in Corridor [((startX, startY), (endX, startY + corridorWidth)),((startX, startY), (startX + corridorWidth, endY))] S.empty
     (startX, startY) = getCenter roomACoords
     (endX, endY) = getCenter roomBCoords
     halfWidth = corridorWidth `div` 2
     in Corridor [((startX, startY - 1), (endX, startY + 1)), ((endX - 1, startY), (endX + 1, endY))] S.empty
-
-createCorridor' :: (Room, Room) -> IO Room
-createCorridor' (Room roomACoords@((x1a, y1a), (x2a, y2a)) _ _, Room roomBCoords@((x1b, y1b), (x2b, y2b)) _ _) = do
-    let (startX, startY) = getCenter roomACoords
-    let (endX, endY) = getCenter roomBCoords
-    let halfWidth = corridorWidth `div` 2
-    print (startX, startY, endX, endY)
-    return $ Corridor [((startX, startY - 1), (endX, startY + 1)), ((endX - 1, startY), (endX + 1, endY))] S.empty
 
 getCenter :: RectBoundaries -> Coordinates
 getCenter ((startX, startY), (endX, endY)) =
