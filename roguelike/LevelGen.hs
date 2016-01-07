@@ -71,7 +71,7 @@ roomToTiles (Room bounds@((startX, startY), (endX, endY)) meldedRooms _) =
     isBoundary :: Int -> Int -> Int -> Bool
     isBoundary coord startBound endBound = coord == startBound || coord == endBound
 roomToTiles (Corridor legs crossedRooms) = let
-  legRoomsWithoutIntersections = map legToRoom legs--foldl M.union M.empty (map (roomToTiles . legToRoom))
+  legRoomsWithoutIntersections = map legToRoom legs
   legRoomsWithIntersections =
     map updateCrossIntersections legRoomsWithoutIntersections
   legToRoom :: RectBoundaries -> Room
@@ -195,7 +195,10 @@ createCorridor (Room roomACoords@((x1a, y1a), (x2a, y2a)) _ _, Room roomBCoords@
     (startX, startY) = getCenter roomACoords
     (endX, endY) = getCenter roomBCoords
     halfWidth = corridorWidth `div` 2
-    in Corridor [((startX, startY - 1), (endX, startY + 1)), ((endX - 1, startY), (endX + 1, endY))] S.empty
+    horizontalLeg x1 x2 y = ((x1, y - 1), (x2, y + 1))
+    verticalLeg x y1 y2 = if y1 < y2 then ((x - 1, y1 - 1), (x + 1, y2 + 1))
+                                     else ((x - 1, y1 + 1), (x + 1, y2 - 1))
+    in Corridor [horizontalLeg startX endX startY, verticalLeg endX startY endY] S.empty
 
 getCenter :: RectBoundaries -> Coordinates
 getCenter ((startX, startY), (endX, endY)) =
