@@ -26,3 +26,6 @@ coinFlip :: IO Bool
 coinFlip = do
   result <- (randomRIO (0, 1)) :: IO Int
   return $ result == 0
+
+zipWithIndex :: [a] -> [(Int, a)]
+zipWithIndex = zipWith (,) [0..]
