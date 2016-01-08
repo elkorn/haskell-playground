@@ -20,7 +20,7 @@ startGame = do
 
 startingWorld :: IO WorldState
 startingWorld = do
-    customLevel <- generateLevel $ LevelSpec Small
+    customLevel <- generateLevel CaveGenerator $ LevelSpec Small
     return $ startingState
             { worldLevel = customLevel
             , worldLevels = [customLevel]
