@@ -1,6 +1,7 @@
 module LevelGen (generateLevel) where
 
 import Control.Applicative
+import Control.Monad
 import Debug.Trace
 
 import qualified Data.List as L
@@ -37,21 +38,22 @@ minHeight = 4
 
 corridorWidth = 2
 
+
 generateLevel :: LevelSpec -> IO Level
 generateLevel spec = do
     let baseLevel = emptyLevel
             { levelMax = (80, 40)
             }
-    rooms <- generateRooms baseLevel [] 2
-    print $ map roomCoordinates rooms
-    print $ map (getCenter . roomCoordinates) rooms
+    rooms <- generateRooms baseLevel [] 4
+    -- print $ map roomCoordinates rooms
+    -- print $ map (getCenter . roomCoordinates) rooms
     corridors <- generateCorridors rooms
-    print $ map corridorCoordinates corridors
+    -- print $ map corridorCoordinates corridors
     return $
         -- updateLevelMax $
         baseLevel
         { levelTiles = foldl M.union M.empty $
-          map roomToTiles (rooms ++ corridors) 
+          map roomToTiles (rooms ++ corridors)
         }
 
 roomToTiles :: Room -> M.Map Coordinates Tile
@@ -68,18 +70,22 @@ roomToTiles (Room bounds@((startX, startY), (endX, endY)) meldedRooms _) =
     shouldBeMelded :: Coordinates -> Bool
     shouldBeMelded coordinates = any (flip isInsideBounds coordinates) meldBounds
     meldBounds = map roomCoordinates $ S.toList meldedRooms
-    isBoundary :: Int -> Int -> Int -> Bool
-    isBoundary coord startBound endBound = coord == startBound || coord == endBound
 roomToTiles (Corridor legs crossedRooms) = let
-  legRoomsWithoutIntersections = map legToRoom legs
-  legRoomsWithIntersections =
-    map updateCrossIntersections legRoomsWithoutIntersections
-  legToRoom :: RectBoundaries -> Room
-  legToRoom leg = Room leg crossedRooms S.empty
-  updateCrossIntersections :: Room -> Room
-  updateCrossIntersections room =
-    room {roomMeldedWith = S.union (roomMeldedWith room) $ S.fromList $ except room legRoomsWithoutIntersections }
-  in foldl M.union M.empty $ map roomToTiles legRoomsWithIntersections
+  legToTiles :: RectBoundaries -> M.Map Coordinates Tile
+  legToTiles leg@((startX, startY), (endX, endY)) =
+    M.fromList $ zip coordinates $ map roomCoordinatesToTile coordinates
+    where coordinates = rectCoordinates leg
+          roomCoordinatesToTile coordinates@(x, y)
+           | shouldBeMelded coordinates = Floor
+           | isBoundary x startX endX || isBoundary y startY endY = Wall
+           | otherwise = Floor
+          shouldBeMelded :: Coordinates -> Bool
+          shouldBeMelded coordinates = any (flip isInsideBounds coordinates) meldBounds
+          meldBounds = ((map roomCoordinates $ S.toList crossedRooms) ++ (except leg legs))
+  in foldl M.union M.empty (map legToTiles legs)
+
+isBoundary :: Int -> Int -> Int -> Bool
+isBoundary coord startBound endBound = coord == startBound || coord == endBound
 
 except :: (Eq a) => a -> [a] -> [a]
 except val = filter (/=val)
@@ -144,8 +150,12 @@ intersection roomA@((x1a,y1a),(x2a,y2a)) roomB =
     intersectingCoordinates = filter (isInsideBounds roomB) roomACoordinates
 
 isInsideBounds :: RectBoundaries -> Coordinates -> Bool
-isInsideBounds ((roomX1, roomY1), (roomX2, roomY2)) (x,y) =
-    x > roomX1 && x < roomX2 && y > roomY1 && y < roomY2
+isInsideBounds ((boundsX1, boundsY1), (boundsX2, boundsY2)) (x,y) =
+    x > minX && x < maxX && y > minY && y < maxY
+    where minX = minimum [boundsX1, boundsX2]
+          maxX = maximum [boundsX1, boundsX2]
+          minY = minimum [boundsY1, boundsY2]
+          maxY = maximum [boundsY1, boundsY2]
 
 meldRoomWithAnother :: Room -> Room -> Room
 meldRoomWithAnother roomA roomB =
@@ -168,6 +178,7 @@ meldRooms roomToMeldIn roomsToMeldInto intersectingRooms =
 generateCorridors :: [Room] -> IO [Room]
 generateCorridors rooms = do
   connections <- generateConnections rooms
+  -- TODO: update corridor intersections
   return $ map updateCrossedRooms $ createCorridorsForConnections connections
   where
     generateConnections :: [Room] -> IO [(Room, Room)]
