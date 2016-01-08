@@ -62,7 +62,7 @@ prepareGame world = do
     hSetBuffering stdout NoBuffering
     hideCursor
     setTitle "Game!"
-    -- clearScreen
+    clearScreen
     drawWorld world
 
 drawHero :: WorldState -> IO ()
