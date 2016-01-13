@@ -1,4 +1,8 @@
 module Types where
+
+import Control.Monad.Trans.State
+import Control.Monad.Trans.Reader
+
 import qualified Data.Map as M
 
 type Coordinates = (Int, Int)
@@ -132,3 +136,7 @@ emptyLevel = Level
 
 startingState :: WorldState
 startingState = World startingHero 0 emptyLevel [emptyLevel]
+
+data GameConfig = GameConfig
+
+type Game = ReaderT GameConfig (StateT WorldState IO)
